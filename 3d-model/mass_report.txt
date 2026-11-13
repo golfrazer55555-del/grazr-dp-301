@@ -1,0 +1,3 @@
+head body volume 56.53 cm^3, caps 6.18 cm^3
+SUS304 head mass (body + caps) = 497.4 g  (spec 395 g)
+wing bore radius 10.70 mm (wall 1.80 mm), web height 6.0 mm
