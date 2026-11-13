@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>GRAZR DP-301 Promo</title>
+<style>
+@font-face{font-family:Mont;font-weight:200;src:url(fonts/montserrat-latin-200-normal.woff2)}
+@font-face{font-family:Mont;font-weight:300;src:url(fonts/montserrat-latin-300-normal.woff2)}
+@font-face{font-family:Mont;font-weight:500;src:url(fonts/montserrat-latin-500-normal.woff2)}
+@font-face{font-family:Mont;font-weight:600;src:url(fonts/montserrat-latin-600-normal.woff2)}
+@font-face{font-family:Mont;font-weight:700;src:url(fonts/montserrat-latin-700-normal.woff2)}
+@font-face{font-family:Mont;font-weight:800;src:url(fonts/montserrat-latin-800-normal.woff2)}
+@font-face{font-family:Pret;font-weight:300;src:url(fonts/Pretendard-Light.woff2)}
+@font-face{font-family:Pret;font-weight:400;src:url(fonts/Pretendard-Regular.woff2)}
+@font-face{font-family:Pret;font-weight:500;src:url(fonts/Pretendard-Medium.woff2)}
+@font-face{font-family:Pret;font-weight:600;src:url(fonts/Pretendard-SemiBold.woff2)}
+@font-face{font-family:Pret;font-weight:700;src:url(fonts/Pretendard-Bold.woff2)}
+html,body{margin:0;background:#000;overflow:hidden}
+canvas{display:block}
+</style>
+<script src="hitenv.js"></script>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+/* ------------------------------------------------------------------
+   GRAZR DP-301 — 30s promo, 1920x1080. Deterministic: render(t) draws
+   the frame at time t (seconds). Timeline is locked to the music:
+   track offset 5.515s => drop at 7.00s, beat = 0.552s, the quiet break
+   (14.78–15.84s) carries the putter impact sound.
+------------------------------------------------------------------- */
+const W = 1920, H = 1080, BEAT = 0.552;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+ctx.imageSmoothingQuality = 'high';
+
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const P = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, x) => a + (b - a) * x;
+const eo = x => 1 - Math.pow(1 - x, 3);
+const eo5 = x => 1 - Math.pow(1 - x, 5);
+const eio = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const ei = x => x * x * x;
+const D2R = Math.PI / 180;
+
+/* ---------------- assets ---------------- */
+const NAMES = ['top-ball','behind-ball','head-behind','head-bottom','head-cover','face','head-side','head-top','logo','grip','shaft','shaft-end'];
+const IM = {};
+const REFL = {};
+const off = document.createElement('canvas'); const octx = off.getContext('2d');
+
+function loadAll() {
+  return Promise.all(NAMES.map(n => new Promise((res, rej) => {
+    const i = new Image(); i.onload = () => { IM[n] = i; res(); }; i.onerror = rej; i.src = 'assets/' + n + '.png';
+  })));
+}
+function reflection(n) {
+  if (REFL[n]) return REFL[n];
+  const im = IM[n], c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+  const x = c.getContext('2d');
+  x.translate(0, im.height); x.scale(1, -1); x.drawImage(im, 0, 0); x.setTransform(1, 0, 0, 1, 0, 0);
+  x.globalCompositeOperation = 'destination-in';
+  const g = x.createLinearGradient(0, 0, 0, im.height * .45);
+  g.addColorStop(0, 'rgba(0,0,0,.55)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = g; x.fillRect(0, 0, im.width, im.height);
+  return REFL[n] = c;
+}
+/* image with optional specular sweep (s in 0..1 travels across) */
+function withSweep(n, s, strength = .6) {
+  const im = IM[n];
+  if (s == null || s <= 0 || s >= 1) return im;
+  off.width = im.width; off.height = im.height;
+  octx.clearRect(0, 0, off.width, off.height);
+  octx.drawImage(im, 0, 0);
+  octx.globalCompositeOperation = 'source-atop';
+  const span = im.width + im.height, c = lerp(-.25, 1.25, s) * span, bw = span * .12;
+  const g = octx.createLinearGradient(c - bw, 0, c + bw, bw * .6);
+  g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(.5, `rgba(255,255,255,${strength})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+  octx.fillStyle = g; octx.fillRect(0, 0, off.width, off.height);
+  octx.globalCompositeOperation = 'source-over';
+  return off;
+}
+function img(n, cx, cy, sc, o = {}) {
+  const im = IM[n], w = im.width * sc, h = im.height * sc;
+  ctx.save();
+  ctx.globalAlpha *= (o.alpha ?? 1);
+  ctx.translate(cx, cy);
+  if (o.rot) ctx.rotate(o.rot);
+  if (o.reflect) {
+    ctx.save(); ctx.globalAlpha *= o.reflect;
+    ctx.drawImage(reflection(n), -w / 2, h / 2 + (o.gap ?? 4) * sc, w, h);
+    ctx.restore();
+  }
+  ctx.drawImage(withSweep(n, o.sweep, o.sweepStrength), -w / 2, -h / 2, w, h);
+  ctx.restore();
+}
+function glowFloor(cx, cy, rx, ry, a) {
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(1, ry / rx);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+  g.addColorStop(0, `rgba(255,255,255,${.10 * a})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+}
+function bg(cx = W / 2, cy = H / 2, k = 1) {
+  ctx.fillStyle = '#050505'; ctx.fillRect(0, 0, W, H);
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 1000);
+  g.addColorStop(0, `rgba(255,255,255,${.085 * k})`); g.addColorStop(.55, `rgba(255,255,255,${.025 * k})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+
+/* ---------------- typography ---------------- */
+function font(fam, wt, sz) { return `${wt} ${sz}px ${fam === 'M' ? 'Mont' : 'Pret'}`; }
+function txt(s, x, y, o = {}) {
+  ctx.save();
+  ctx.font = font(o.fam || 'M', o.wt || 400, o.size || 24);
+  ctx.letterSpacing = (o.ls || 0) + 'px';
+  ctx.textAlign = o.align || 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.globalAlpha *= (o.alpha ?? 1);
+  ctx.fillStyle = o.color || '#fff';
+  let dx = 0;
+  if (o.align === 'center' && o.ls) dx = o.ls / 2; // compensate trailing tracking
+  if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = o.lw || 2; ctx.strokeText(s, x + dx, y); }
+  else ctx.fillText(s, x + dx, y);
+  ctx.restore();
+}
+/* masked rise-up reveal */
+function reveal(s, x, y, p, o = {}) {
+  if (p <= 0) return;
+  const sz = o.size || 24, e = eo5(p);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, y - sz * 1.15, W, sz * 1.45); ctx.clip();
+  txt(s, x, y + (1 - e) * sz * 1.2, { ...o, alpha: (o.alpha ?? 1) * clamp(p * 3) });
+  ctx.restore();
+}
+function hline(x, y, w, a = 1, c = '255,255,255', lw = 1.5) {
+  if (w <= 0) return;
+  ctx.save(); ctx.fillStyle = `rgba(${c},${a})`; ctx.fillRect(x, y - lw / 2, w, lw); ctx.restore();
+}
+/* left-column feature copy */
+function feature(t, t0, tEnd, d) {
+  const x = d.x ?? 150, y = d.y ?? 400;
+  const out = 1 - P(t, tEnd - .22, tEnd);
+  ctx.save(); ctx.globalAlpha = out;
+  reveal(d.num, x, y, P(t, t0, t0 + .45), { wt: 500, size: 22, ls: 6, color: '#9a9a9a' });
+  hline(x + 52, y - 8, 70 * eo(P(t, t0 + .1, t0 + .6)), .5);
+  reveal(d.en, x, y + 86, P(t, t0 + .08, t0 + .6), { wt: 800, size: d.enSize || 68, ls: 2 });
+  reveal(d.kr, x, y + 148, P(t, t0 + .2, t0 + .7), { fam: 'P', wt: 600, size: 42, color: '#e9e9e9' });
+  hline(x, y + 190, 64 * eo(P(t, t0 + .35, t0 + .9)), .8);
+  d.sub.forEach((s, i) => reveal(s, x, y + 246 + i * 38, P(t, t0 + .42 + i * .07, t0 + .95 + i * .07), { fam: 'P', wt: 400, size: 25, color: '#b4b4b4' }));
+  reveal(d.subEn, x, y + 246 + d.sub.length * 38 + 22, P(t, t0 + .6, t0 + 1.1), { wt: 500, size: 15, ls: 4, color: '#7d7d7d' });
+  ctx.restore();
+}
+function dashed(x1, y1, x2, y2, a, dash = [10, 8], lw = 1.5) {
+  ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = lw; ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.restore();
+}
+function ring(x, y, r, a, lw = 1.5) {
+  if (a <= 0) return;
+  ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = lw; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+}
+function brackets(cx, cy, hw, hh, len, a) {
+  ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = 2;
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    const x = cx + sx * hw, y = cy + sy * hh;
+    ctx.beginPath(); ctx.moveTo(x - sx * len, y); ctx.lineTo(x, y); ctx.lineTo(x, y - sy * len); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* ---------------- scenes ---------------- */
+const SC = {
+  intro: [0, 3.3], design: [3.3, 7.0], drop: [7.0, 7.0 + 2 * BEAT], neck: [7.0 + 2 * BEAT, 11.42],
+  mallet: [11.42, 14.75], sound: [14.75, 16.95], cnc: [16.95, 20.25], spec: [20.25, 24.67],
+  close: [24.67, 26.88], logo: [26.88, 30]
+};
+
+function sIntro(t) {
+  bg(W / 2, 540, .8);
+  const ex = P(t, 2.9, 3.3);
+  ctx.save();
+  ctx.translate(W / 2, 540); ctx.scale(1 + ei(ex) * .12, 1 + ei(ex) * .12); ctx.translate(-W / 2, -540);
+  ctx.globalAlpha = 1 - ex;
+  const lw = 760 * eo5(P(t, .15, 1.3));
+  hline(W / 2 - lw / 2, 572, lw, .55);
+  reveal('GRAZR', W / 2, 372, P(t, .45, 1.2), { wt: 300, size: 26, ls: 26, align: 'center', color: '#cfcfcf' });
+  // DP-301 rises out of the line, silver gradient with a moving glint
+  const p = P(t, .85, 1.75);
+  if (p > 0) {
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 300, W, 271); ctx.clip();
+    ctx.font = font('M', 800, 190); ctx.letterSpacing = '22px'; ctx.textAlign = 'center';
+    const gx = lerp(-300, 2200, P(t, 1.7, 2.9));
+    const g = ctx.createLinearGradient(gx - 260, 0, gx + 260, 0);
+    g.addColorStop(0, '#b9b9b9'); g.addColorStop(.5, '#ffffff'); g.addColorStop(1, '#b9b9b9');
+    ctx.fillStyle = g;
+    ctx.fillText('DP-301', W / 2 + 11, 540 + (1 - eo5(p)) * 230);
+    ctx.restore();
+  }
+  // subtitle drops below the line
+  const q = P(t, 1.45, 2.1);
+  if (q > 0) {
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 573, W, 120); ctx.clip();
+    txt('MALLET PUTTER   ·   말렛 퍼터', W / 2, 636 - (1 - eo5(q)) * 60, { fam: 'P', wt: 400, size: 26, ls: 10, align: 'center', color: '#d0d0d0', alpha: q });
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function sDesign(t) {
+  const [a, b] = SC.design, u = t - a;
+  bg(1290, 560, 1);
+  const ex = P(t, b - .35, b);
+  const sc = lerp(1.12, 1.26, eio(P(t, a, b))) + ei(ex) * .25;
+  glowFloor(1290, 890, 520, 70, P(u, 0, .8));
+  img('top-ball', 1290, 540, sc, { alpha: eo(P(u, 0, .7)), rot: lerp(-4, 0, eo(P(u, 0, 2.5))) * D2R, sweep: P(u, 1.0, 2.4), sweepStrength: .45 });
+  feature(t, a + .3, b, { num: '01', en: 'PREMIUM DESIGN', kr: '고급진 디자인', sub: ['절제된 블랙 & 메탈 실루엣,', '어디서나 돋보이는 프리미엄 퍼터'], subEn: 'REFINED BLACK & METAL SILHOUETTE' });
+}
+
+function sDrop(t) {
+  const [a] = SC.drop, u = t - a, step = BEAT / 2, k = Math.min(3, Math.floor(u / step)), v = (u - k * step) / step;
+  bg(W / 2, 540, 1.2);
+  // giant outlined model name scrolling behind
+  txt('DP-301', lerp(1150, 770, u / (2 * BEAT)), 700, { wt: 800, size: 430, ls: 20, align: 'center', stroke: 'rgba(255,255,255,.10)', lw: 2 });
+  const dir = k % 2 ? -1 : 1, dx = dir * lerp(70, -70, eo(v)), s = lerp(1.08, 1, eo(v));
+  const cuts = [
+    ['grip', 1180, 540, .95, -28], ['head-cover', 1180, 540, .9, 0],
+    ['shaft', 1150, 540, 1.45, 0], ['shaft-end', 1180, 520, 1.0, -62]
+  ];
+  const c = cuts[k];
+  img(c[0], c[1] + dx, c[2], c[3] * s, { rot: c[4] * D2R });
+  const words = ['PRECISION', 'CRAFT', 'BALANCE', 'CONTROL'];
+  txt(words[k], 150, 930, { wt: 800, size: 104, ls: 4, alpha: .95 });
+  txt('0' + (k + 1) + ' / 04', 150, 800, { wt: 500, size: 18, ls: 6, color: '#8a8a8a' });
+}
+
+function sNeck(t) {
+  const [a, b] = SC.neck, u = t - a;
+  bg(1300, 560, 1);
+  const sc = 1.2, im = IM['head-behind'], w = im.width * sc, h = im.height * sc;
+  const px = 1300, py = 900;              // pivot: bottom-centre of the head (ground contact)
+  const ang = 7 * Math.exp(-2.3 * u) * Math.cos(2 * Math.PI * 1.05 * u) * D2R;
+  const rise = (1 - eo(P(u, 0, .45))) * 60;
+  const out = 1 - P(t, b - .2, b);
+  ctx.save(); ctx.globalAlpha = out;
+  // ground line
+  const gl = eo(P(u, .9, 1.6));
+  glowFloor(px, py, 520, 40, 1);
+  hline(px - 560 * gl, py, 1120 * gl, .35);
+  ctx.save();
+  ctx.translate(px, py + rise); ctx.rotate(ang);
+  ctx.globalAlpha *= eo(P(u, 0, .4));
+  ctx.drawImage(withSweep('head-behind', P(u, 1.4, 2.4), .4), -w / 2, -h, w, h);
+  // overlays in image space (stay locked to the head while it rocks)
+  const ex = (380 - im.width / 2) * sc, ey = -(im.height - 422) * sc;  // shaft entry point
+  const o = P(u, 1.1, 1.7);
+  if (o > 0) {
+    // vertical centre line
+    dashed(ex, 0, ex, lerp(0, -h - 40, eo(o)), .55 * o);
+    ring(ex, ey, 16, .9 * o, 2);
+    ring(ex, ey, 16 + 26 * ((u * 1.4) % 1), .5 * (1 - (u * 1.4) % 1) * o, 1.5);
+    // lie angle: shaft vs. ground on the heel side
+    const la = P(u, 1.5, 2.2);
+    if (la > 0) {
+      dashed(ex, ey, ex - 190 * eo(la), ey, .5);
+      ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${.8 * la})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(ex, ey, 110, Math.PI, Math.PI + 74 * D2R * eo(la)); ctx.stroke(); ctx.restore();
+      const mid = Math.PI + 37 * D2R;
+      txt('74°', ex + Math.cos(mid) * 150, ey + Math.sin(mid) * 150 + 10, { wt: 500, size: 26, align: 'center', alpha: la });
+    }
+    // callout
+    const cl = eo(P(u, 1.3, 1.9));
+    ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${.6 * cl})`; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(ex + 14, ey - 14); ctx.lineTo(ex + 14 + 90 * cl, ey - 104 * cl); ctx.lineTo(ex + 14 + 90 * cl + 170 * cl, ey - 104 * cl); ctx.stroke(); ctx.restore();
+    txt('CENTER-NECK', ex + 110, ey - 116, { wt: 700, size: 20, ls: 4, alpha: cl });
+    txt('샤프트 · 헤드 중앙 연결', ex + 110, ey - 84, { fam: 'P', wt: 400, size: 18, color: '#bdbdbd', alpha: cl });
+    txt('90°', ex + 14, -h - 10, { wt: 500, size: 22, align: 'left', alpha: .8 * o });
+  }
+  ctx.restore();
+  ctx.restore();
+  feature(t, a + .15, b, { num: '02', en: 'CENTER-NECK', kr: '세워지는 센터넥', sub: ['샤프트가 헤드 중앙에 연결되어', '스스로 똑바로 서는 자립형 구조', '정확한 어드레스와 정렬'], subEn: 'SELF-STANDING  ·  EASY ALIGNMENT' });
+}
+
+function ball(x, y, r, a = 1) {
+  ctx.save(); ctx.globalAlpha *= a;
+  const g = ctx.createRadialGradient(x - r * .35, y - r * .35, r * .1, x, y, r);
+  g.addColorStop(0, '#ffffff'); g.addColorStop(.7, '#e2e2e2'); g.addColorStop(1, '#9d9d9d');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+function sMallet(t) {
+  const [a, b] = SC.mallet, u = t - a;
+  bg(1000, 540, 1);
+  const out = 1 - P(t, b - .3, b);
+  ctx.save(); ctx.globalAlpha = out;
+  const im = IM['head-top'], sc = 1.0, cx = 1000 + (1 - eo5(P(u, 0, .6))) * 140, cy = 540;
+  img('head-top', cx, cy, sc, { rot: Math.PI, alpha: eo(P(u, 0, .4)), sweep: P(u, .5, 1.5), sweepStrength: .35 });
+  // image-space -> screen (rotated 180°)
+  const S = (x, y) => [cx - (x - im.width / 2) * sc, cy - (y - im.height / 2) * sc];
+  const faceX = cx + im.width / 2 * sc, lineY = S(0, 410)[1];
+  // weight distribution markers on the two rear wings
+  const wm = P(u, .5, 1.1);
+  if (wm > 0) {
+    const pts = [S(500, 95), S(500, 715)], cg = S(250, 410);
+    pts.forEach(([x, y], i) => {
+      ring(x, y, 30, .8 * wm, 2); ring(x, y, 30 + 30 * ((u * 1.3 + i * .5) % 1), .45 * (1 - (u * 1.3 + i * .5) % 1) * wm);
+      dashed(x, y, lerp(x, cg[0], eo(wm)), lerp(y, cg[1], eo(wm)), .35 * wm, [6, 6]);
+    });
+    ctx.save(); ctx.fillStyle = `rgba(255,255,255,${wm})`; ctx.beginPath(); ctx.arc(cg[0], cg[1], 7, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    txt('WEIGHT BALANCE', pts[0][0], pts[0][1] - 52, { wt: 600, size: 16, ls: 4, align: 'center', alpha: wm });
+  }
+  // the roll: ball leaves the face and runs dead straight
+  const r = 46, bx0 = faceX + r + 6;
+  const roll = ei(P(u, 1.35, 2.6)) * 0.55 + eo(P(u, 1.35, 2.6)) * 0.45;
+  const bx = lerp(bx0, W + 120, roll);
+  const app = eo(P(u, .7, 1.1));
+  if (app > 0) {
+    // narrow dispersion cone + centre line
+    const cl = P(u, 1.35, 2.0);
+    if (cl > 0) {
+      ctx.save(); ctx.fillStyle = `rgba(255,255,255,${.05 * cl})`;
+      ctx.beginPath(); ctx.moveTo(bx0, lineY); ctx.lineTo(W, lineY - 40); ctx.lineTo(W, lineY + 40); ctx.closePath(); ctx.fill(); ctx.restore();
+      dashed(bx0, lineY, lerp(bx0, W, eo(cl)), lineY, .6, [14, 10], 2);
+      txt('STRAIGHT ROLL', 1560, lineY - 62, { wt: 600, size: 16, ls: 4, align: 'center', alpha: cl });
+    }
+    for (let i = 1; i <= 5; i++) ball(bx - i * 26 * roll * 3, lineY, r, .08 * (1 - i / 6) * (roll > 0 ? 1 : 0));
+    ball(bx, lineY, r, app);
+  }
+  ctx.restore();
+  feature(t, a + .15, b, { num: '03', en: 'MALLET HEAD', kr: '말렛 타입 헤드', sub: ['안정적인 무게 중심 배분으로', '오프 센터 히트에도 흔들림 없는 직진성'], subEn: 'STABLE BALANCE  ·  STRAIGHT ROLL' });
+}
+
+const HIT = 15.0;   // impact peak in the musical break
+function sSound(t) {
+  const [a, b] = SC.sound, u = t - a;
+  ctx.fillStyle = '#030303'; ctx.fillRect(0, 0, W, H);
+  const hit = t - HIT, re = t - 15.84;
+  const out = 1 - P(t, b - .18, b);
+  ctx.save(); ctx.globalAlpha = out;
+  bg(W / 2, 470, hit > 0 ? 1 + 1.2 * Math.exp(-hit * 3) : .5);
+  // ripples
+  if (hit > 0) for (let i = 0; i < 4; i++) {
+    const h = hit - i * .12; if (h <= 0) continue;
+    const r = 60 + h * 900, al = .55 * Math.exp(-h * 2.2);
+    ctx.save(); ctx.translate(W / 2, 470); ctx.scale(1, .42); ring(0, 0, r, al, 2.5); ctx.restore();
+  }
+  const shake = hit > 0 ? Math.sin(hit * 90) * 7 * Math.exp(-hit * 9) : 0;
+  const punch = re > 0 ? .06 * Math.exp(-re * 6) : 0;
+  img('face', W / 2 + shake, 470, 1.32 + u * .03 + punch, { alpha: eo(P(u, 0, .25)), reflect: .5, sweep: P(t, HIT, HIT + .7), sweepStrength: .5 });
+  // waveform of the real impact sound
+  const env = window.HIT_ENV, n = env.length, wv = 1400, x0 = W / 2 - wv / 2, bw = wv / n;
+  const prog = hit > 0 ? eo(P(hit, 0, .9)) : 0, yb = 830;
+  ctx.save();
+  for (let i = 0; i < n; i++) {
+    const x = x0 + i * bw; const vis = (i / n) < prog;
+    const amp = vis ? Math.max(1.5, Math.sqrt(env[i]) * 95 * (0.85 + .15 * Math.sin(i * 1.7))) : 1.5;
+    ctx.fillStyle = `rgba(255,255,255,${vis ? .85 : .25})`;
+    ctx.fillRect(x, yb - amp, Math.max(2, bw - 4), amp * 2);
+  }
+  ctx.restore();
+  ctx.restore();
+  ctx.save(); ctx.globalAlpha = out;
+  reveal('04', W / 2, 168, P(t, HIT + .02, HIT + .4), { wt: 500, size: 22, ls: 6, align: 'center', color: '#9a9a9a' });
+  reveal('CRISP IMPACT SOUND', W / 2, 250, P(t, HIT + .05, HIT + .5), { wt: 800, size: 64, ls: 4, align: 'center' });
+  reveal('청량한 타구음', W / 2, 312, P(t, HIT + .15, HIT + .6), { fam: 'P', wt: 600, size: 40, align: 'center', color: '#e9e9e9' });
+  reveal('맑고 경쾌하게 울리는 타구음, 손끝으로 전해지는 확실한 피드백', W / 2, 960, P(t, HIT + .4, HIT + .9), { fam: 'P', wt: 400, size: 24, align: 'center', color: '#b4b4b4' });
+  ctx.restore();
+}
+
+function sCnc(t) {
+  const [a, b] = SC.cnc, u = t - a;
+  bg(1330, 560, 1);
+  const out = 1 - P(t, b - .22, b);
+  ctx.save(); ctx.globalAlpha = out;
+  const cx = 1330, cy = 560, sc = lerp(1.04, .98, eio(P(t, a, b)));
+  img('head-bottom', cx, cy, sc, { rot: lerp(4, 0, eo(P(u, 0, 2))) * D2R, alpha: eo(P(u, 0, .35)), sweep: P(u, .5, 1.6), sweepStrength: .5 });
+  // HUD
+  const hb = eo(P(u, .15, .7));
+  brackets(cx, cy, 480 + (1 - hb) * 60, 420 + (1 - hb) * 60, 46, .7 * hb);
+  const scan = P(u, .3, 2.0);
+  if (scan > 0 && scan < 1) {
+    const y = cy - 400 + 800 * eio(scan);
+    const g = ctx.createLinearGradient(0, y - 40, 0, y + 2);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(255,255,255,.18)');
+    ctx.fillStyle = g; ctx.fillRect(cx - 470, y - 40, 940, 42);
+    hline(cx - 470, y, 940, .7);
+  }
+  txt('SUS 304', cx + 480, cy - 440, { wt: 600, size: 16, ls: 5, align: 'right', alpha: hb });
+  txt('STAINLESS STEEL', cx - 480, cy - 440, { wt: 600, size: 16, ls: 5, alpha: hb });
+  txt('FULL CNC MILLED', cx - 480, cy + 456, { wt: 600, size: 16, ls: 5, alpha: hb });
+  txt('FORGED', cx + 480, cy + 456, { wt: 600, size: 16, ls: 5, align: 'right', alpha: hb });
+  ctx.restore();
+  // counter
+  const cnt = Math.round(100 * eo(P(u, .15, 1.2)));
+  ctx.save(); ctx.globalAlpha = out;
+  reveal(cnt + '%', 146, 330, P(u, .05, .45), { wt: 200, size: 150, ls: 2 });
+  ctx.restore();
+  feature(t, a + .2, b, { y: 410, num: '05', en: 'FULL CNC MILLING', enSize: 60, kr: '100% 풀 CNC 밀링 가공', sub: ['SUS 304 스테인리스 스틸을 전면 단조 밀링,', '높은 정밀도와 일정한 타구감'], subEn: 'FORGED SUS 304  ·  PRECISION MILLED' });
+}
+
+function sSpec(t) {
+  const [a, b] = SC.spec, u = t - a;
+  bg(W / 2, 360, 1);
+  const out = 1 - P(t, b - .25, b);
+  ctx.save(); ctx.globalAlpha = out;
+  reveal('SPECIFICATIONS', 150, 130, P(u, 0, .4), { wt: 700, size: 22, ls: 8 });
+  reveal('제품 사양', 150, 168, P(u, .08, .5), { fam: 'P', wt: 400, size: 20, color: '#9a9a9a' });
+  glowFloor(W / 2, 520, 420, 40, 1);
+  img('head-top', W / 2 + (1 - eo5(P(u, 0, .7))) * -160, 345, .56 + u * .012, { rot: -Math.PI / 2, alpha: eo(P(u, 0, .4)), sweep: P(u, .6, 1.8), sweepStrength: .35 });
+  const specs = [
+    { en: 'HEAD WEIGHT', kr: '헤드 무게', v: 385, unit: 'g' },
+    { en: 'LOFT', kr: '로프트', v: 3, deg: true, unit: '' },
+    { en: 'LIE', kr: '라이각', v: 74, deg: true, unit: '' },
+    { en: 'LENGTH', kr: '길이 옵션', str: '33/34', unit: 'in' }
+  ];
+  specs.forEach((s, i) => {
+    const t0 = a + .3 + i * BEAT, p = P(t, t0, t0 + .5), x = W / 2 + (i - 1.5) * 400;
+    if (i > 0) { const dl = eo(P(t, t0 - .1, t0 + .4)); ctx.save(); ctx.fillStyle = `rgba(255,255,255,${.25 * dl})`; ctx.fillRect(x - 200, 700 - 90 * dl, 1, 180 * dl); ctx.restore(); }
+    reveal(s.en, x, 640, p, { wt: 600, size: 16, ls: 5, align: 'center', color: '#9a9a9a' });
+    const val = (s.str ?? String(Math.round(s.v * eo(P(t, t0, t0 + .9))))) + (s.deg ? '°' : '');
+    ctx.save(); ctx.font = font('M', 300, 104); ctx.letterSpacing = '0px';
+    const vw = ctx.measureText(val).width; ctx.font = font('M', 500, 30); const uw = ctx.measureText(s.unit).width; ctx.restore();
+    const gap = s.unit ? 8 : 0, vx = x - (vw + uw + gap) / 2;
+    reveal(val, vx, 760, P(t, t0 + .05, t0 + .55), { wt: 300, size: 104 });
+    reveal(s.unit, vx + vw + 8, 760, P(t, t0 + .15, t0 + .6), { wt: 500, size: 30, color: '#cfcfcf' });
+    reveal(s.kr, x, 818, P(t, t0 + .2, t0 + .65), { fam: 'P', wt: 400, size: 22, align: 'center', color: '#b4b4b4' });
+  });
+  ctx.restore();
+}
+
+function sClose(t) {
+  const [a, b] = SC.close, u = t - a;
+  bg(W / 2, 470, 1.1);
+  const out = 1 - P(t, b - .3, b);
+  ctx.save(); ctx.globalAlpha = out;
+  glowFloor(W / 2, 830, 480, 50, 1);
+  img('behind-ball', W / 2, 455, lerp(1.18, 1.3, P(t, a, b)), { alpha: eo(P(u, 0, .35)), sweep: P(u, .5, 1.6), sweepStrength: .4 });
+  reveal('PRECISION IN EVERY STROKE', W / 2, 940, P(u, .25, .8), { wt: 700, size: 52, ls: 8, align: 'center' });
+  reveal('모든 스트로크에 정확함을 더하다', W / 2, 996, P(u, .45, 1.0), { fam: 'P', wt: 400, size: 28, ls: 2, align: 'center', color: '#c8c8c8' });
+  ctx.restore();
+}
+
+const LOGO_HIT = 27.05;
+function sLogo(t) {
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  const h = t - LOGO_HIT;
+  if (h > -0.3) bg(W / 2, 470, clamp(1 + (h > 0 ? .8 * Math.exp(-h * 2.5) : 0), 0, 2) * eo(P(t, LOGO_HIT - .3, LOGO_HIT + .2)));
+  const p = eo5(P(t, LOGO_HIT - .05, LOGO_HIT + .9));
+  if (p > 0) img('logo', W / 2, 470, lerp(1.18, 1.0, p) + P(t, LOGO_HIT, 30) * .04, { alpha: p, sweep: P(t, 27.9, 29.0), sweepStrength: .7 });
+  const lw = 420 * eo5(P(t, 27.6, 28.4));
+  hline(W / 2 - lw / 2, 735, lw, .4);
+  reveal('DP-301   MALLET PUTTER', W / 2, 790, P(t, 27.8, 28.4), { wt: 500, size: 22, ls: 14, align: 'center', color: '#d0d0d0' });
+}
+
+/* ---------------- master ---------------- */
+const FLASH = [[7.0, .9, .35], [7.0 + BEAT / 2, .25, .12], [7.0 + BEAT, .3, .12], [7.0 + 1.5 * BEAT, .25, .12],
+               [SC.neck[0], .35, .2], [SC.mallet[0], .3, .2], [HIT, .45, .25], [15.84, .55, .35],
+               [SC.cnc[0], .3, .2], [SC.spec[0], .3, .2], [LOGO_HIT, .35, .5]];
+function render(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  const inS = k => t >= SC[k][0] && t < SC[k][1];
+  if (inS('intro')) sIntro(t);
+  else if (inS('design')) sDesign(t);
+  else if (inS('drop')) sDrop(t);
+  else if (inS('neck')) sNeck(t);
+  else if (inS('mallet')) sMallet(t);
+  else if (inS('sound')) sSound(t);
+  else if (inS('cnc')) sCnc(t);
+  else if (inS('spec')) sSpec(t);
+  else if (inS('close')) sClose(t);
+  else sLogo(t);
+  // brand mark
+  if (t > 3.5 && t < 26.6 && !inS('sound')) {
+    const a = .5 * P(t, 3.5, 4.2) * (1 - P(t, 26.3, 26.6));
+    txt('GRAZR  DP-301', W - 90, 92, { wt: 600, size: 14, ls: 6, align: 'right', color: '#ffffff', alpha: a });
+  }
+  // flashes
+  let f = 0;
+  for (const [ft, fa, fd] of FLASH) { const d = t - ft; if (d >= 0 && d < fd * 3) f = Math.max(f, fa * Math.exp(-d / fd * 2.2)); }
+  if (f > .002) { ctx.fillStyle = `rgba(255,255,255,${f})`; ctx.fillRect(0, 0, W, H); }
+  // vignette
+  const v = ctx.createRadialGradient(W / 2, H / 2, H * .45, W / 2, H / 2, H * 1.05);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.55)');
+  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  // final fade
+  const fo = P(t, 29.35, 30);
+  if (fo > 0) { ctx.fillStyle = `rgba(0,0,0,${fo})`; ctx.fillRect(0, 0, W, H); }
+}
+
+window.ready = (async () => {
+  await loadAll();
+  const fams = [['Mont', [200, 300, 500, 600, 700, 800]], ['Pret', [300, 400, 500, 600, 700]]];
+  await Promise.all(fams.flatMap(([f, ws]) => ws.map(w => document.fonts.load(`${w} 40px ${f}`, 'Aa가힣°%'))));
+  await document.fonts.ready;
+  render(0);
+  return true;
+})();
+window.render = render;
+// preview mode: play in real time when opened directly (?play)
+if (location.search.includes('play')) window.ready.then(() => { const s = performance.now(); (function loop() { const t = ((performance.now() - s) / 1000) % 30; render(t); requestAnimationFrame(loop); })(); });
+</script>
+</body>
+</html>
