@@ -313,9 +313,9 @@ def mat(name, color, metallic=0.0, rough=0.5, coat=0.0, image=None, alpha_img=No
 
 
 T = lambda f: os.path.join(TEXDIR, f)
-M_BLACK = mat("Black_CNC_Coat", (0.004, 0.004, 0.0045), rough=0.3, milled=0.06)
-M_STEEL = mat("SUS304_Polished", (0.80, 0.79, 0.77), metallic=1.0, rough=0.16)
-M_ENGRAVE = mat("Engraving_Black", (0.01, 0.01, 0.01), rough=0.6)
+M_BLACK = mat("Black_CNC_Coat", (0.004, 0.004, 0.0045), rough=0.3)
+M_STEEL = mat("SUS304_Polished", (0.92, 0.91, 0.89), metallic=1.0, rough=0.24)
+M_ENGRAVE = mat("Engraving_Black", (0.003, 0.003, 0.003), rough=0.85)
 M_PAINT = mat("White_Paintfill", (0.86, 0.86, 0.86), rough=0.45)
 M_SHAFT = mat("Graphite_Shaft_GlossBlack", (0.004, 0.004, 0.0045), rough=0.12, coat=1.0)
 M_SHAFT_PRINT = mat("Shaft_Print_White", (0.85, 0.85, 0.85), rough=0.2, coat=1.0, alpha_img=T("shaft_decal.png"))
@@ -762,7 +762,9 @@ shot("03_top", hc + Vector((0, 0.0, 0.42)), hc, 85, studio(), up=(0, 1, 0), head
 shot("04_back", hc + Vector((0, 0.40, 0.06)), hc, 85, studio())
 shot("05_sole", hc + Vector((0, 0.0, -0.42)), hc, 85, below(studio()), up=(0, -1, 0), head_only=True)
 caps_c = Vector((0, DEPTH, R_WING)) * 0.001
-shot("06_weights", caps_c + Vector((-0.07, 0.17, 0.07)), caps_c + Vector((0, 0, -0.002)), 100, studio(caps_c, 0.5))
+cap_t = Vector((-X_WING, DEPTH, R_WING)) * 0.001
+shot("06_weights", cap_t + Vector((-0.06, 0.15, 0.05)), cap_t + Vector((0.012, -0.012, -0.002)), 85,
+     studio(cap_t, 0.5) + [("back", cap_t + Vector((-0.05, 0.3, 0.12)), cap_t, 0.25, 4.0)])
 gc = m_(BUTT - D_SHAFT * (GRIP_LEN / 2))
 shot("07_grip", gc + m_(N_FLAT * 680 + V_SIDE * 290), gc, 85,
      [("key", gc + m_(N_FLAT * 500 + V_SIDE * -450 + D_SHAFT * 300), gc, 0.25, 7.0),
