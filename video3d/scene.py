@@ -561,7 +561,7 @@ def pose_stand(t, a, b):
     to the golfer's view down the line (stepping back to check the alignment)."""
     u = lin(t, a, b)
     show(ball=True)
-    target_line(0.5 * ease(lin(t, a + 3.0, a + 5.0)))
+    target_line(0.5 * ease(lin(t, a + 4.2, a + 5.8)))     # appears once we are behind the ball
     floor_pool(0.05, -0.30, 0.55, 1.60)
     s = t - a                                     # just set down: a tiny damped rock, then still
     rock = math.radians(1.1) * math.exp(-2.6 * s) * math.cos(2 * math.pi * 1.25 * s) if s < 3.0 else 0.0
