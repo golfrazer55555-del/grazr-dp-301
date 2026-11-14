@@ -192,6 +192,8 @@ def main():
     ff = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     n = int(round(DURATION * FPS))
     last, cur = None, None
+    rng = np.random.default_rng(301)
+    dither = [(rng.random((H, W, 1), np.float32) - 0.5) * (1.2 / 255) for _ in range(8)]
     for f in range(n):
         t = f / FPS
         if f <= LAST_3D:
@@ -209,6 +211,7 @@ def main():
         if f > LAST_3D:
             ov.logo(img, t)
         img *= ease(t / 0.9)                          # open from black
+        img += dither[f % len(dither)]                # break up banding in the dark gradients
         ff.stdin.write((np.clip(img, 0, 1) * 255 + 0.5).astype(np.uint8).tobytes())
         if f % 120 == 0:
             print(f"compose {f}/{n}", flush=True)
