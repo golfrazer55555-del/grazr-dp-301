@@ -40,8 +40,9 @@ DEPTH = 68.0              # face -> back of the end weights
 WING_END = DEPTH - CAP_T  # back of the black wing body
 WEB_H = 6.0               # centre plate height
 LEDGE_H = 9.5             # raised ledge along the inner side of each wing
-CUT_R = 21.0              # ball cutout (42 mm)
-CUT_APEX = 28.0           # face -> front of the cutout (straight-down sole photo)
+WEB_END = 63.5            # rear edge of the web + ledges (straight-up sole photo)
+CUT_R = 22.2              # ball cutout (44.4 mm, straight-up sole photo, perspective-corrected)
+CUT_APEX = 26.8           # face -> front of the cutout (straight-up sole photo)
 CUT_Y = CUT_APEX + CUT_R
 LOFT = 3.0
 LIE = 74.0
@@ -59,6 +60,9 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 col = scene.collection
 FONT_B = bpy.data.fonts.load(os.path.join(tex.FONT_DIR, "Inter-Bold.otf"))
+# sole engraving fonts matched to the straight-up sole photo (both SIL OFL 1.1)
+FONT_SOLE = bpy.data.fonts.load(os.path.join(HERE, "fonts", "AsapCondensed_800ExtraBold.ttf"))
+FONT_MODEL = bpy.data.fonts.load(os.path.join(HERE, "fonts", "Montserrat_500Medium.ttf"))
 
 
 def link(obj):
@@ -201,14 +205,15 @@ def frame_matrix(origin, X, Y, Z):
     return m
 
 
-def text_mesh(name, body, size, matrix, extrude=0.02, align_x="CENTER", spacing=1.0, squash=1.0):
+def text_mesh(name, body, size, matrix, extrude=0.02, align_x="CENTER", spacing=1.0, squash=1.0,
+              font=None, align_y="CENTER"):
     cu = bpy.data.curves.new(name + "_crv", "FONT")
     cu.body = body
-    cu.font = FONT_B
+    cu.font = font or FONT_B
     cu.size = size
     cu.extrude = extrude
     cu.align_x = align_x
-    cu.align_y = "CENTER"
+    cu.align_y = align_y
     cu.space_line = spacing
     ob = link(bpy.data.objects.new(name + "_txt", cu))
     dg = bpy.context.evaluated_depsgraph_get()
@@ -299,7 +304,7 @@ def mat(name, color, metallic=0.0, rough=0.5, coat=0.0, image=None, alpha_img=No
         w = nt.nodes.new("ShaderNodeTexWave")
         w.wave_type = "BANDS"
         w.bands_direction = "X"
-        w.inputs["Scale"].default_value = 0.5            # ~0.6 mm pitch (object space is mm)
+        w.inputs["Scale"].default_value = 0.7            # 0.314/scale = ~0.45 mm pitch (sole photo)
         w.inputs["Distortion"].default_value = 0.0
         geo = nt.nodes.new("ShaderNodeNewGeometry")
         sep = nt.nodes.new("ShaderNodeSeparateXYZ")
@@ -366,10 +371,18 @@ for s in (-1, 1):
     w = prism(f"wing_{s}", circle(R_WING, 96), origin=(s * X_WING, 0, R_WING), d0=4.0, d1=WING_END)
     bevel(w, 0.8, 3, 30)
     parts.append(w)
-    ledge = box(f"ledge_{s}", min(s * 24.0, s * 31.0), max(s * 24.0, s * 31.0), BAR_T - 1.0, WING_END - 6.0, 0.0, LEDGE_H)
+    # ledge along the inner side of the wing: runs to the web's rear edge and rolls
+    # over at the back (side profile in Y-Z, extruded across X) like the top-view photos
+    r_end = 3.0
+    prof = [(BAR_T - 1.0, 0.0), (WEB_END, 0.0), (WEB_END, LEDGE_H - r_end)]
+    prof += [(WEB_END - r_end + r_end * math.cos(math.radians(a)), LEDGE_H - r_end + r_end * math.sin(math.radians(a)))
+             for a in range(10, 91, 10)]
+    prof += [(BAR_T - 1.0, LEDGE_H)]
+    xa, xb = sorted((s * 24.0, s * 31.0))
+    ledge = prism(f"ledge_{s}", prof, U=(0, 1, 0), V=(0, 0, 1), W=(1, 0, 0), d0=xa, d1=xb)
     bevel(ledge, 0.6, 2, 30)
     parts.append(ledge)
-parts.append(box("web", -X_WING, X_WING, 6.0, WING_END - 3.0, 0.0, WEB_H))
+parts.append(box("web", -X_WING, X_WING, 6.0, WEB_END, 0.0, WEB_H))
 head = front
 head.name = "DP301_Head"
 for part in parts:
@@ -491,18 +504,26 @@ print("decals ...")
 paint = []
 paint.append(box("align_line", -0.5, 0.5, BAR_T, CUT_APEX + 0.3, WEB_H - 0.05, WEB_H + 0.03))
 sole_m = lambda o, X, squash=1.0: frame_matrix(o, X, Vector((0, 0, -1)).cross(Vector(X)), (0, 0, -1))
-paint.append(text_mesh("sole_DP301", "DP-301", 7.4, sole_m((19.5, 27.5, -0.01), (1, 0, 0)), squash=0.9))
-paint.append(text_mesh("sole_toe", "100%CNC MILLED\nFORGED MODEL\nSTAINLESS\nSUS 304", 3.3,
-                       sole_m((-42.5, 45.0, -0.01), (1, 0, 0)), align_x="LEFT", spacing=1.18, squash=0.72))
-paint.append(text_mesh("sole_heel", "DUAL BALANCE\nW.T/385g\nLOFT/3°\nLIE/74°", 3.3,
-                       sole_m((41.5, 45.0, -0.01), (1, 0, 0)), align_x="RIGHT", spacing=1.18, squash=0.72))
+# Sole engraving laid out from the straight-up sole photo (mm, perspective-corrected):
+# text reads from below with the tops toward the face; baseline Y = line centre + cap/2.
+CAP_SOLE, CAP_MODEL = 2.7, 4.0
+SZ_SOLE, SZ_MODEL = CAP_SOLE / 0.5374, CAP_MODEL / 0.5469     # Blender cap height per unit size
+paint.append(text_mesh("sole_DP301", "DP-301", SZ_MODEL, sole_m((30.9, 24.6 + CAP_MODEL / 2, -0.01), (1, 0, 0)),
+                       align_x="RIGHT", align_y="BOTTOM_BASELINE", squash=1.02, font=FONT_MODEL))
+for i, (toe_txt, heel_txt) in enumerate(zip(("100%CNC MILLED", "FORGED MODEL", "STAINLESS", "SUS 304"),
+                                            ("DUAL BALANCE", "W.T/385g", "LOFT/3°", "LIE/74°"))):
+    yb = (37.1, 41.2, 45.2, 49.1)[i] + CAP_SOLE / 2
+    paint.append(text_mesh(f"sole_toe{i}", toe_txt, SZ_SOLE, sole_m((-40.9, yb, -0.01), (1, 0, 0)),
+                           align_x="LEFT", align_y="BOTTOM_BASELINE", squash=0.85, font=FONT_SOLE))
+    paint.append(text_mesh(f"sole_heel{i}", heel_txt, SZ_SOLE, sole_m((40.8, yb, -0.01), (1, 0, 0)),
+                           align_x="RIGHT", align_y="BOTTOM_BASELINE", squash=0.85, font=FONT_SOLE))
 paint_obj = join(paint, "DP301_Paintfill")
 assign(paint_obj, M_PAINT)
 
 decals = [
     # sole: hex mark + GRAZR wordmark (reads from below, tops toward the face)
-    decal("DP301_Sole_Mark", M_MARK, tex.MARK_ASPECT, (-24.8, 16.0, 0.0), (1, 0, 0), (0, -1, 0), 14.3),
-    decal("DP301_Sole_GRAZR", M_WORD, tex.WORD_ASPECT, (8.6, 17.3, 0.0), (1, 0, 0), (0, -1, 0), 7.6),
+    decal("DP301_Sole_Mark", M_MARK, tex.MARK_ASPECT, (-23.6, 15.9, 0.0), (1, 0, 0), (0, -1, 0), 18.0),
+    decal("DP301_Sole_GRAZR", M_WORD, tex.WORD_ASPECT, (9.5, 16.1, 0.0), (1, 0, 0), (0, -1, 0), 7.8),
     # back wall: GRAZR between the pockets (reads from behind)
     decal("DP301_Back_GRAZR", M_WORD, tex.WORD_ASPECT, (0.0, BAR_T, ZC_BACK), (-1, 0, 0), (0, 0, 1), 3.0),
 ]
