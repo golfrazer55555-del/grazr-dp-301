@@ -78,3 +78,4 @@
 - 양쪽 문구: 글자 높이 2.7 mm, 줄 중심 Y 37.1 / 41.2 / 45.2 / 49.1, 토 쪽 왼쪽 정렬 X -40.9, 힐 쪽 오른쪽 정렬 X 40.8
 - 폰트: 문구 Asap Condensed ExtraBold, DP-301 Montserrat Medium
 - 샤프트 34", 그립 27 cm, 헤드 385 g, 전체 395 g (사용자 확인)
+- 페이스 밀링 홈·대시 슬롯·테두리 홈 = 코팅이 깎여 드러난 은색 스틸 (`head-front(face) with ruler.png`)
