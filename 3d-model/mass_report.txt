@@ -1,5 +1,5 @@
-SUS304 head body 60.23 cm^3 -> 477.6 g
+SUS304 head body 60.99 cm^3 -> 483.6 g
 end weights 2 x 20 g (spec; modelled volume 2.67 cm^3 each)
-head total = 517.6 g  (spec 385 g)
+head total = 523.6 g  (spec 385 g)
 wing bore radius 10.70 mm (wall 1.80 mm), web 6.0 mm, ledge 9.5 mm
 club length 34", lie 74.0 deg, loft 3.0 deg

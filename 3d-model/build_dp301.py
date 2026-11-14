@@ -41,7 +41,7 @@ WING_END = DEPTH - CAP_T  # back of the black wing body
 WEB_H = 6.0               # centre plate height
 LEDGE_H = 9.5             # raised ledge along the inner side of each wing
 CUT_R = 21.0              # ball cutout (42 mm)
-CUT_APEX = 25.0           # face -> front of the cutout
+CUT_APEX = 28.0           # face -> front of the cutout (straight-down sole photo)
 CUT_Y = CUT_APEX + CUT_R
 LOFT = 3.0
 LIE = 74.0
@@ -294,32 +294,40 @@ def mat(name, color, metallic=0.0, rough=0.5, coat=0.0, image=None, alpha_img=No
         b.inputs["Distance"].default_value = 0.4
         nt.links.new(t.outputs["Color"], b.inputs["Height"])
         nt.links.new(b.outputs["Normal"], bsdf.inputs["Normal"])
-    if milled:                      # fine CNC fly-cut lines
+    if milled:                      # straight CNC lines on the sole only (run face -> back)
         tc = nt.nodes.new("ShaderNodeTexCoord")
         w = nt.nodes.new("ShaderNodeTexWave")
-        w.wave_type = "RINGS"
-        w.inputs["Scale"].default_value = 0.9
+        w.wave_type = "BANDS"
+        w.bands_direction = "X"
+        w.inputs["Scale"].default_value = 0.5            # ~0.6 mm pitch (object space is mm)
         w.inputs["Distortion"].default_value = 0.0
-        mp = nt.nodes.new("ShaderNodeMapping")
-        mp.inputs["Location"].default_value = (-60.0, -140.0, 0.0)
+        geo = nt.nodes.new("ShaderNodeNewGeometry")
+        sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+        lt = nt.nodes.new("ShaderNodeMath")
+        lt.operation = "LESS_THAN"
+        lt.inputs[1].default_value = -0.9
+        mul = nt.nodes.new("ShaderNodeMath")
+        mul.operation = "MULTIPLY"
+        mul.inputs[1].default_value = milled
         b = nt.nodes.new("ShaderNodeBump")
-        b.inputs["Strength"].default_value = milled
         b.inputs["Distance"].default_value = 0.02
-        nt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
-        nt.links.new(mp.outputs["Vector"], w.inputs["Vector"])
+        nt.links.new(tc.outputs["Object"], w.inputs["Vector"])
         nt.links.new(w.outputs["Fac"], b.inputs["Height"])
+        nt.links.new(geo.outputs["Normal"], sep.inputs["Vector"])
+        nt.links.new(sep.outputs["Z"], lt.inputs[0])
+        nt.links.new(lt.outputs["Value"], mul.inputs[0])
+        nt.links.new(mul.outputs["Value"], b.inputs["Strength"])
         nt.links.new(b.outputs["Normal"], bsdf.inputs["Normal"])
     return m
 
 
 T = lambda f: os.path.join(TEXDIR, f)
-M_BLACK = mat("Black_CNC_Coat", (0.004, 0.004, 0.0045), rough=0.3)
+M_BLACK = mat("Black_CNC_Coat", (0.004, 0.004, 0.0045), rough=0.3, milled=0.12)
 M_STEEL = mat("SUS304_Polished", (0.92, 0.91, 0.89), metallic=1.0, rough=0.24)
 M_ENGRAVE = mat("Engraving_Black", (0.003, 0.003, 0.003), rough=0.85)
 M_PAINT = mat("White_Paintfill", (0.86, 0.86, 0.86), rough=0.45)
 M_SHAFT = mat("Graphite_Shaft_GlossBlack", (0.004, 0.004, 0.0045), rough=0.12, coat=1.0)
 M_SHAFT_PRINT = mat("Shaft_Print_White", (0.85, 0.85, 0.85), rough=0.2, coat=1.0, alpha_img=T("shaft_decal.png"))
-M_FERRULE = mat("Ferrule_GlossBlack", (0.006, 0.006, 0.006), rough=0.15, coat=0.6)
 M_GRIP = mat("Grip_Polyurethane", (1, 1, 1), rough=0.32, image=T("grip_albedo.png"), bump_img=T("grip_bump.png"), bump_strength=0.12)
 M_GRIP_CAP = mat("Grip_Cap", (1, 1, 1), rough=0.6, image=T("grip_cap.png"), bump_img=T("grip_cap.png"), bump_strength=0.4)
 M_MARK = mat("Decal_GR_Mark", (0.88, 0.88, 0.88), rough=0.4, alpha_img=T("mark_white.png"))
@@ -483,18 +491,18 @@ print("decals ...")
 paint = []
 paint.append(box("align_line", -0.5, 0.5, BAR_T, CUT_APEX + 0.3, WEB_H - 0.05, WEB_H + 0.03))
 sole_m = lambda o, X, squash=1.0: frame_matrix(o, X, Vector((0, 0, -1)).cross(Vector(X)), (0, 0, -1))
-paint.append(text_mesh("sole_DP301", "DP-301", 4.4, sole_m((20.0, 18.8, -0.01), (1, 0, 0)), squash=0.95))
-paint.append(text_mesh("sole_toe", "100%CNC MILLED\nFORGED MODEL\nSTAINLESS\nSUS 304", 2.2,
-                       sole_m((-40.0, 38.0, -0.01), (1, 0, 0)), align_x="LEFT", squash=0.85))
-paint.append(text_mesh("sole_heel", "DUAL BALANCE\nW.T/385g\nLOFT/3°\nLIE/74°", 2.2,
-                       sole_m((40.0, 35.0, -0.01), (1, 0, 0)), align_x="RIGHT", squash=0.85))
+paint.append(text_mesh("sole_DP301", "DP-301", 7.4, sole_m((19.5, 27.5, -0.01), (1, 0, 0)), squash=0.9))
+paint.append(text_mesh("sole_toe", "100%CNC MILLED\nFORGED MODEL\nSTAINLESS\nSUS 304", 3.3,
+                       sole_m((-42.5, 45.0, -0.01), (1, 0, 0)), align_x="LEFT", spacing=1.18, squash=0.72))
+paint.append(text_mesh("sole_heel", "DUAL BALANCE\nW.T/385g\nLOFT/3°\nLIE/74°", 3.3,
+                       sole_m((41.5, 45.0, -0.01), (1, 0, 0)), align_x="RIGHT", spacing=1.18, squash=0.72))
 paint_obj = join(paint, "DP301_Paintfill")
 assign(paint_obj, M_PAINT)
 
 decals = [
     # sole: hex mark + GRAZR wordmark (reads from below, tops toward the face)
-    decal("DP301_Sole_Mark", M_MARK, tex.MARK_ASPECT, (-28.0, 9.5, 0.0), (1, 0, 0), (0, -1, 0), 16.0),
-    decal("DP301_Sole_GRAZR", M_WORD, tex.WORD_ASPECT, (6.0, 11.0, 0.0), (1, 0, 0), (0, -1, 0), 7.4),
+    decal("DP301_Sole_Mark", M_MARK, tex.MARK_ASPECT, (-24.8, 16.0, 0.0), (1, 0, 0), (0, -1, 0), 14.3),
+    decal("DP301_Sole_GRAZR", M_WORD, tex.WORD_ASPECT, (8.6, 17.3, 0.0), (1, 0, 0), (0, -1, 0), 7.6),
     # back wall: GRAZR between the pockets (reads from behind)
     decal("DP301_Back_GRAZR", M_WORD, tex.WORD_ASPECT, (0.0, BAR_T, ZC_BACK), (-1, 0, 0), (0, 0, 1), 3.0),
 ]
@@ -504,10 +512,6 @@ decals.append(face_logo)
 
 # ================================================================ SHAFT + GRIP
 print("shaft & grip ...")
-ferrule = tube("DP301_Ferrule", ENTRY - D_SHAFT * 1.0, D_SHAFT, 6.0, 5.6, 5.0, 64, U=N_FLAT)
-bevel(ferrule, 0.6, 2, 30)
-shade_smooth(ferrule)
-assign(ferrule, M_FERRULE)
 
 shaft = tube("DP301_Shaft", S0, D_SHAFT, SHAFT_LEN, R_TIP, R_BUTT, 64, U=N_FLAT)
 shade_smooth(shaft, 60)
@@ -702,7 +706,7 @@ cam_data = bpy.data.cameras.new("cam")
 cam_data.clip_start = 0.001
 cam = link(bpy.data.objects.new("Camera", cam_data))
 scene.camera = cam
-CLUB_ONLY = (shaft, shaft_print, grip, ferrule)
+CLUB_ONLY = (shaft, shaft_print, grip)
 
 
 def look(loc, target, up=(0, 0, 1), roll=0.0):
@@ -754,7 +758,7 @@ studio = lambda c=hc, d=0.6: [
     ("rim", c + Vector((0.0, 0.5, 0.3)) * d, c, 0.5 * d, 5.0),
     ("top", c + Vector((0, 0.03, 0.6)) * d, c, 0.9 * d, 1.8),
 ]
-below = lambda L: [(n, Vector((p.x, p.y, -p.z)), t, sz, pw) for n, p, t, sz, pw in L]
+below = lambda L: [(n, Vector((p.x, p.y, -p.z)), t, sz, pw * 0.55) for n, p, t, sz, pw in L]
 os.makedirs(os.path.join(OUT, "renders"), exist_ok=True)
 shot("01_hero", hc + Vector((-0.20, -0.22, 0.15)), hc + Vector((0.004, 0, 0)), 85, studio())
 shot("02_face", hc + Vector((0, -0.40, 0.0)), hc, 100, studio())
@@ -771,10 +775,10 @@ shot("07_grip", gc + m_(N_FLAT * 680 + V_SIDE * 290), gc, 85,
       ("fill", gc + m_(N_FLAT * 300 + V_SIDE * 600), gc, 0.35, 2.5),
       ("rim", gc + m_(N_FLAT * -300 + V_SIDE * 300 + D_SHAFT * 200), gc, 0.3, 6.0)],
      up=tuple(D_SHAFT), res=(1200, 1600))
-lc = m_(G0 - D_SHAFT * 125)
-shot("08_shaft", lc + m_(N_FLAT * 450 + V_SIDE * -60), lc, 85,
-     [("key", lc + m_(N_FLAT * 300 + V_SIDE * -250 + D_SHAFT * 100), lc, 0.5, 8.0),
-      ("fill", lc + m_(N_FLAT * 200 + V_SIDE * 300), lc, 0.5, 3.0)],
+lc = m_(G0 - D_SHAFT * 205)                       # DP-301 label is on the back of the shaft
+shot("08_shaft", lc + m_(N_FLAT * -450 + V_SIDE * -60), lc, 85,
+     [("key", lc + m_(N_FLAT * -300 + V_SIDE * -250 + D_SHAFT * 100), lc, 0.5, 8.0),
+      ("fill", lc + m_(N_FLAT * -200 + V_SIDE * 300), lc, 0.5, 3.0)],
      up=tuple(-V_SIDE))
 mid = Vector((0.112, 0.007, 0.415))
 shot("09_full", mid + Vector((-0.75, -2.45, 0.25)), mid, 85,

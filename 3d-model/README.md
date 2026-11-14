@@ -19,11 +19,11 @@ Blender(`bpy` 5.3)에서 Python 스크립트로 만든 모델입니다. 실측�
   페이스 바 두께 14 mm, 볼 컷아웃 지름 42 mm, 로프트 3°, 라이 74°, 오른손잡이용, 순수 블랙 무광 코팅
 - **페이스**: 다이아몬드 밀링(±32°, 다이아몬드 8.3 × 5.2 mm, 칸마다 가로 홈), 테두리 2 mm, 힐 쪽 흰색 GR 로고
 - **무게추**: 지름 25 mm × 두께 2 mm 폴리시드 SUS304, 톱니 6개 + 구멍 6개 + 원형 링 + 토크스 나사 (검정 각인)
-- **바닥**: GR 로고, GRAZR, DP-301, `100%CNC MILLED / FORGED MODEL / STAINLESS / SUS 304`,
+- **바닥**: 정면 촬영 사진 기준 배치, 앞뒤 방향 CNC 가공 결, GR 로고, GRAZR, DP-301, `100%CNC MILLED / FORGED MODEL / STAINLESS / SUS 304`,
   `DUAL BALANCE / W.T/385g / LOFT/3° / LIE/74°`
 - **뒷면**: 둥근 사각 포켓 2개 + GRAZR, 윗면 흰색 정렬선, 날개 안쪽 단차
-- **샤프트**: 유광 블랙 그래파이트, 구경 9.4 mm(.370"), 센터 샤프트·논오프셋, 34",
-  그립 아래 GR 로고 + `DP-301 HIGH PERFORMANCE GRAPHITE / DESIGNED BY U.S.A. / S PUTTER FLEX` 인쇄
+- **샤프트**: 유광 블랙 그래파이트, 구경 9.4 mm(.370"), 센터 샤프트·논오프셋, 34", 호젤/페럴 없이 헤드에 바로 삽입.
+  앞면: 그립 아래 약 70 mm에 GR 로고 / 뒷면: 그립 아래 165 mm부터 `DP-301 HIGH PERFORMANCE GRAPHITE / DESIGNED BY U.S.A. / S PUTTER FLEX`
 - **그립**: 길이 270 mm, 지름 29 mm + 평평한 앞면 20 mm, 폴리우레탄 질감,
   대형 GR 헥사곤 로고·회색 패널 위 GRAZR·옆면 그래픽·`NON-SLIP`·`STANDARD 2.0`, 끝 캡 GR 엠보싱
 

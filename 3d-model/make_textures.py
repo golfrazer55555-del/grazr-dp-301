@@ -173,7 +173,7 @@ def make_grip():
 
 
 # ------------------------------------------------------------------ shaft
-SHAFT_DECAL_LEN = 260.0   # mm of shaft below the grip covered by the decal sleeve
+SHAFT_DECAL_LEN = 300.0   # mm of shaft below the grip covered by the decal sleeve
 SHAFT_PX = 16
 
 
@@ -192,42 +192,45 @@ def make_shaft(radius_at):
     m = mask_sized(MARK, mw * around_px(v_mark), mh * SHAFT_PX)
     alpha.paste(255, (int(W / 2 - m.width / 2), int((v_mark - mh / 2) * SHAFT_PX)), m)
 
-    # DP-301 label, reads toward the grip; composed horizontally then rotated
-    big = font("ExtraBoldItalic", 4.6 * SHAFT_PX / 0.73)
-    small = font("Medium", 1.45 * SHAFT_PX / 0.73)
-    parts = []
-    parts.append(text_mask("DP-301", big))
-    l1, l2 = text_mask("HIGH PERFORMANCE GRAPHITE", small), text_mask("DESIGNED BY U.S.A.", small)
-    block = Image.new("L", (max(l1.width, l2.width), l1.height + l2.height + 6), 0)
-    block.paste(l1, (0, 0))
-    block.paste(l2, (0, l1.height + 6))
-    parts.append(block)
-    # "S" flex emblem: rounded box outline with S inside
-    eh = int(4.2 * SHAFT_PX)
-    emb = Image.new("L", (int(eh * 1.25), eh), 0)
-    de = ImageDraw.Draw(emb)
-    de.rounded_rectangle((2, 2, emb.width - 3, emb.height - 3), radius=eh // 4, outline=255, width=max(3, eh // 12))
-    sm = text_mask("S", font("ExtraBold", eh * 0.62 / 0.73), pad=0)
-    emb.paste(sm, ((emb.width - sm.width) // 2, (emb.height - sm.height) // 2), sm)
-    parts.append(emb)
-    f1, f2 = text_mask("PUTTER", small), text_mask("FLEX", small)
-    flex = Image.new("L", (max(f1.width, f2.width), f1.height + f2.height + 6), 0)
-    flex.paste(f1, (0, 0))
-    flex.paste(f2, (0, f1.height + 6))
-    parts.append(flex)
+    # DP-301 label on the BACK of the shaft (u = 0 / 1 seam), 165 mm below the grip,
+    # reading from the grip toward the head. Sizes measured from shaft-behind-closeup.png.
+    def fit(mask, length_mm, height_mm):          # length along the shaft, height across it
+        return mask.resize((int(length_mm * SHAFT_PX), int(height_mm * SHAFT_PX)), Image.LANCZOS)
 
-    gapx = int(3.0 * SHAFT_PX)
-    Lw = sum(p.width for p in parts) + gapx * (len(parts) - 1)
-    Lh = max(p.height for p in parts)
+    big = text_mask("DP-301", font("ExtraBold", 120), pad=0)
+    small = font("Bold", 60)
+    l1 = text_mask("HIGH PERFORMANCE GRAPHITE", small, pad=0)
+    l2 = text_mask("DESIGNED BY U.S.A.", small, pad=0)
+    eh = 200
+    emb = Image.new("L", (int(eh * 1.3), eh), 0)
+    de = ImageDraw.Draw(emb)
+    de.rounded_rectangle((4, 4, emb.width - 5, emb.height - 5), radius=eh // 4, outline=255, width=eh // 10)
+    sm = text_mask("S", font("ExtraBold", eh * 0.6 / 0.73), pad=0)
+    emb.paste(sm, ((emb.width - sm.width) // 2, (emb.height - sm.height) // 2), sm)
+    f1, f2 = text_mask("PUTTER", small, pad=0), text_mask("FLEX", small, pad=0)
+
+    cap = 1.75                                    # small text cap height (mm)
+    two = Image.new("L", (int(43.5 * SHAFT_PX), int((2 * cap + 0.8) * SHAFT_PX)), 0)
+    two.paste(fit(l1, 43.5, cap), (0, 0))
+    two.paste(fit(l2, 43.5 * l2.width / l1.width, cap), (0, int((cap + 0.8) * SHAFT_PX)))
+    flex = Image.new("L", (int(9.0 * SHAFT_PX), int((2 * cap + 0.8) * SHAFT_PX)), 0)
+    flex.paste(fit(f1, 9.0, cap), (0, 0))
+    flex.paste(fit(f2, 9.0 * f2.width / f1.width, cap), (0, int((cap + 0.8) * SHAFT_PX)))
+    pieces = [(fit(big, 24.5, 5.6), 2.4), (two, 3.0), (fit(emb, 6.0, 4.6), 0.8), (flex, 0.0)]
+    Lw = sum(p.width + int(g * SHAFT_PX) for p, g in pieces)
+    Lh = max(p.height for p, _ in pieces)
     label = Image.new("L", (Lw, Lh), 0)
     x = 0
-    for p in parts:
+    for p, g in pieces:
         label.paste(p, (x, (Lh - p.height) // 2))
-        x += p.width + gapx
-    v_label = 175.0                               # centre of the label below the grip
-    rot = label.rotate(90, expand=True)           # reads bottom -> top (toward the grip)
+        x += p.width + int(g * SHAFT_PX)
+    v_start = 165.0
+    v_label = v_start + Lw / SHAFT_PX / 2
+    rot = label.rotate(-90, expand=True)          # reads top -> bottom (grip -> head), tops point +u
     rot = rot.resize((max(1, int(rot.width * around_px(v_label) / SHAFT_PX)), rot.height), Image.LANCZOS)
-    alpha.paste(255, (int(W / 2 - rot.width / 2), int(v_label * SHAFT_PX - rot.height / 2)), rot)
+    y0 = int(v_start * SHAFT_PX)
+    for cx in (0, W):                             # centred on the seam = back of the shaft
+        alpha.paste(255, (int(cx - rot.width / 2), y0), rot)
 
     img.putalpha(alpha)
     img.save(os.path.join(TEX, "shaft_decal.png"))
