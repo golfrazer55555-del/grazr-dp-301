@@ -41,8 +41,8 @@ WING_END = DEPTH - CAP_T  # back of the black wing body
 WEB_H = 6.0               # centre plate height
 LEDGE_H = 9.5             # raised ledge along the inner side of each wing
 WEB_END = 63.5            # rear edge of the web + ledges (straight-up sole photo)
-CUT_R = 22.2              # ball cutout (44.4 mm, straight-up sole photo, perspective-corrected)
-CUT_APEX = 26.8           # face -> front of the cutout (straight-up sole photo)
+CUT_R = 21.0              # ball cutout 42 mm (owner spec) - a snug fit on the 42.67 mm ball (ball pick-up)
+CUT_APEX = 28.0           # face -> front of the cutout; arc centre 49 mm (straight-up sole photo)
 CUT_Y = CUT_APEX + CUT_R
 LOFT = 3.0
 LIE = 74.0
@@ -329,8 +329,6 @@ def mat(name, color, metallic=0.0, rough=0.5, coat=0.0, image=None, alpha_img=No
 T = lambda f: os.path.join(TEXDIR, f)
 M_BLACK = mat("Black_CNC_Coat", (0.004, 0.004, 0.0045), rough=0.3, milled=0.12)
 M_STEEL = mat("SUS304_Polished", (0.92, 0.91, 0.89), metallic=1.0, rough=0.24)
-# face milling cuts through the black coat to bare steel (grooves, dashes, outline read silver)
-M_MILL = mat("SUS304_Milled", (0.72, 0.72, 0.71), metallic=1.0, rough=0.38)
 M_ENGRAVE = mat("Engraving_Black", (0.003, 0.003, 0.003), rough=0.85)
 M_PAINT = mat("White_Paintfill", (0.86, 0.86, 0.86), rough=0.45)
 M_SHAFT = mat("Graphite_Shaft_GlossBlack", (0.004, 0.004, 0.0045), rough=0.12, coat=1.0)
@@ -426,19 +424,16 @@ for n in range(-14, 15):
         if abs(z) > INNER - 1.0 or abs(x) > X_WING + math.sqrt(max((INNER - 1.0) ** 2 - z * z, 0)) - 1.4:
             continue
         cutters.append(prism(f"dash_{n}_{mz}", rounded_rect(2.2, 0.5, 0.24, 3), origin=(x, 0, R_WING + z), d0=-1.0, d1=0.25))
-assign(head, M_BLACK)                     # slot 0 = coat; milled faces get M_MILL
 gset = join(cutters, "SET_grooves")
 clip = prism("SET_clip", stadium(X_WING, INNER, 48), origin=(0, 0, R_WING), d0=-2, d1=2)
 boolean(gset, clip, op="INTERSECT")
 gset.name = "SET_grooves"
-assign(gset, M_MILL)
-boolean(head, gset, transfer=True)
+boolean(head, gset)
 # fine outline groove around the milled field
 ring_o = prism("ring_o", stadium(X_WING, INNER + 0.35, 48), origin=(0, 0, R_WING), d0=-1, d1=0.3)
 ring_i = prism("ring_i", stadium(X_WING, INNER, 48), origin=(0, 0, R_WING), d0=-2, d1=1)
 boolean(ring_o, ring_i)
-assign(ring_o, M_MILL)
-boolean(head, ring_o, transfer=True)
+boolean(head, ring_o)
 
 # shaft bore (centre shafted)
 bore = tube("bore", ENTRY - D_SHAFT * 20, D_SHAFT, 30, BORE_D / 2, BORE_D / 2, 48)
@@ -468,16 +463,7 @@ def loft_shear(obj):
 
 loft_shear(head)
 shade_smooth(head, 35)
-# booleans in INDEX mode leave empty slots: fold those faces back onto the coat (slot 0)
-# (materials.clear() would reset every face index, so pop the empty slots one by one)
-for _i in reversed(range(len(head.data.materials))):
-    if head.data.materials[_i] is None:
-        for _p in head.data.polygons:
-            if _p.material_index == _i:
-                _p.material_index = 0
-        head.data.materials.pop(index=_i)
-print("head materials:", [m.name for m in head.data.materials],
-      "milled faces:", sum(1 for _p in head.data.polygons if _p.material_index == 1))
+assign(head, M_BLACK)        # face grooves are the same black coat (the photo highlights are reflections)
 
 # ---- end weights: polished SUS304 caps, engraved 6-lobe gear, 6 holes, ring, torx screw
 print("end caps ...")

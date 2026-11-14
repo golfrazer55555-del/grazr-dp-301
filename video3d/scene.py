@@ -7,7 +7,7 @@ phrase, the impact on a downbeat, the logo (composited later) on the final hit.
 
   python3 video3d/scene.py --stills 3,9,12.8,16.6,25 --quality preview --out OUT
   python3 video3d/scene.py --shot reveal --quality final --out video3d/frames
-  python3 video3d/scene.py --frames 0-703 --step 2 --quality preview --out OUT
+  python3 video3d/scene.py --frames 0-1054 --step 2 --quality preview --out OUT
 """
 import argparse
 import math
@@ -27,15 +27,19 @@ FPS = 24
 BEAT = 0.45808                     # Stairway - Patrick Patrikios, ~131 BPM
 BAR = 4 * BEAT                     # 1.832 s
 PHRASE = 4 * BAR                   # 7.329 s
-T_IMPACT = 2 * PHRASE + BAR        # 16.49 s, impact on a downbeat
-SHOTS = [                          # name, start, end (video seconds)
-    ("reveal", 0.0, PHRASE),
-    ("face", PHRASE, PHRASE + 2 * BAR),
-    ("sole", PHRASE + 2 * BAR, 2 * PHRASE),
-    ("stroke", 2 * PHRASE, 3 * PHRASE),
-    ("stand", 3 * PHRASE, 4 * PHRASE),
+T_IMPACT = 2 * PHRASE + BAR        # 16.49 s - front impact on a downbeat (the featured sound)
+T_IMPACT2 = 3 * PHRASE + BAR       # 23.82 s - the same stroke seen from above
+T_PICK = 5 * PHRASE + BAR          # 38.48 s - the head clicks over the ball
+SHOTS = [                          # name, start, end (video seconds) - one 4-bar phrase each
+    ("reveal", 0.0, PHRASE),                    # look
+    ("face", PHRASE, PHRASE + 2 * BAR),         # 100% CNC milling
+    ("sole", PHRASE + 2 * BAR, 2 * PHRASE),     # forged SUS304 (sole engraving)
+    ("stroke", 2 * PHRASE, 3 * PHRASE),         # crisp sound
+    ("center", 3 * PHRASE, 4 * PHRASE),         # centre shaft: square head, straight roll
+    ("stand", 4 * PHRASE, 5 * PHRASE),          # stands alone, alignment check from behind
+    ("pickup", 5 * PHRASE, 6 * PHRASE),         # picks the ball up
 ]
-END_3D = 4 * PHRASE                # 29.317 s - the logo takes over on the final hit
+END_3D = 6 * PHRASE                # 43.975 s - the logo takes over on the final hit
 LAST_FRAME = int(round(END_3D * FPS)) - 1
 
 
@@ -237,11 +241,13 @@ BACKDROP.visible_glossy = False
 BACKDROP.visible_diffuse = False
 
 
-def backdrop(loc, strength):
+def backdrop(loc, strength, z0=-0.1, z1=0.9):
     BACKDROP.hide_render = strength <= 0
     BACKDROP.location = loc
     BD_Z.inputs[1].default_value = loc[2]
     BD_S.inputs[1].default_value = strength
+    bup.inputs["From Min"].default_value = z0
+    bup.inputs["From Max"].default_value = z1
 
 
 def make_ball(r=0.021335, n_dimples=392, dimple_r=0.00175, depth=0.00024):
@@ -311,7 +317,8 @@ add_light("spot", "SPOT")
 NO_FLOOR = bpy.data.collections.new("NoFloor")
 NO_FLOOR.objects.link(FLOOR)
 NO_FLOOR.collection_objects[0].light_linking.link_state = "EXCLUDE"
-for nm in ("rimL", "rimR", "top", "sweep", "rake"):
+add_light("keyNF", size=(0.5, 0.5))
+for nm in ("rimL", "rimR", "top", "sweep", "rake", "keyNF"):
     LIGHTS[nm].light_linking.receiver_collection = NO_FLOOR
 LIGHTS["spot"].data.spot_size = math.radians(34)
 LIGHTS["spot"].data.spot_blend = 0.85
@@ -349,11 +356,56 @@ def camera(loc, target, lens, fstop=None, focus=None, roll=0.0):
         cam_data.dof.focus_distance = focus if focus else (Vector(target) - Vector(loc)).length
 
 
-def show(club=True, floor=True, ball=False):
+def show(club=True, floor=True, ball=False, club_in_reflections=True):
     for o in CLUB:
         o.hide_render = not club
+        o.visible_glossy = club_in_reflections     # the overhead shot: no shaft smear on the floor
     FLOOR.hide_render = not floor
     BALL.hide_render = not ball
+
+
+# ------------------------------------------------------------------ target line (alignment)
+# A thin, softly glowing chalk line on the floor in front of the ball, fading into the dark.
+line_me = bpy.data.meshes.new("target_line")
+bm = bmesh.new()
+_w, _y0, _y1 = 0.0007, -0.046, -3.2
+for vx, vy in ((-_w, _y0), (_w, _y0), (_w, _y1), (-_w, _y1)):
+    bm.verts.new((vx, vy, 0.0003))
+bm.faces.new(bm.verts)
+bm.to_mesh(line_me)
+bm.free()
+LINE = bpy.data.objects.new("TargetLine", line_me)
+sc.collection.objects.link(LINE)
+m_line = bpy.data.materials.new("TargetLine_Glow")
+m_line.use_nodes = True
+lnt = m_line.node_tree
+for n in list(lnt.nodes):
+    if n.type != "OUTPUT_MATERIAL":
+        lnt.nodes.remove(n)
+l_tc = lnt.nodes.new("ShaderNodeTexCoord")
+l_sep = lnt.nodes.new("ShaderNodeSeparateXYZ")
+l_fade = lnt.nodes.new("ShaderNodeMapRange")
+l_fade.interpolation_type = "SMOOTHERSTEP"
+l_fade.inputs["From Min"].default_value = -0.05
+l_fade.inputs["From Max"].default_value = -1.6
+l_fade.inputs["To Min"].default_value = 1.0
+l_fade.inputs["To Max"].default_value = 0.0
+LINE_S = lnt.nodes.new("ShaderNodeMath")
+LINE_S.operation = "MULTIPLY"
+l_em = lnt.nodes.new("ShaderNodeEmission")
+l_em.inputs["Color"].default_value = (1.0, 0.98, 0.95, 1)
+lnt.links.new(l_tc.outputs["Object"], l_sep.inputs[0])
+lnt.links.new(l_sep.outputs["Y"], l_fade.inputs["Value"])
+lnt.links.new(l_fade.outputs["Result"], LINE_S.inputs[0])
+lnt.links.new(LINE_S.outputs[0], l_em.inputs["Strength"])
+lnt.links.new(l_em.outputs["Emission"], lnt.nodes["Material Output"].inputs["Surface"])
+LINE.data.materials.append(m_line)
+LINE.visible_glossy = False
+
+
+def target_line(strength):
+    LINE.hide_render = strength <= 0
+    LINE_S.inputs[1].default_value = strength
 
 
 # ------------------------------------------------------------------ stroke kinematics
@@ -361,13 +413,14 @@ def show(club=True, floor=True, ball=False):
 AXIS = D_SHAFT.cross(Vector((0, 1, 0))).normalized()    # +angle moves the head toward the target (-Y)
 PIVOT = GROUND + D_SHAFT * 1.05
 PHI_B = 0.135                                           # backswing / follow-through (rad)
-T0_STROKE = SHOTS[3][1]
-OMEGA = math.pi / (2 * (T_IMPACT - T0_STROKE))
+SWING = BAR                                             # top of backswing -> impact (s)
+OMEGA = math.pi / (2 * SWING)
 
 
-def stroke_phi(t):
-    x = min(t - T0_STROKE, math.pi / OMEGA)
-    return -PHI_B * math.cos(OMEGA * max(x, 0.0))
+def stroke_phi(t, t_imp):
+    """Starts at the top of the backswing one bar before impact, holds the finish."""
+    x = clamp(t - (t_imp - SWING), 0.0, math.pi / OMEGA)
+    return -PHI_B * math.cos(OMEGA * x)
 
 
 def stroke_matrix(phi):
@@ -381,20 +434,31 @@ DECEL = 0.006                       # rolling resistance (slow motion, m/s^2)
 BALL_Y0 = math.tan(math.radians(3.0)) * BALL_R - BALL_R   # touching the lofted face at phi = 0
 
 
-def ball_state(t):
+def ball_state(t, t_imp):
     """Ball centre and roll angle; it rests against the face until impact."""
     d = 0.0
-    if t > T_IMPACT:
-        dt = t - T_IMPACT
-        dt = min(dt, V0 / DECEL)
+    if t > t_imp:
+        dt = min(t - t_imp, V0 / DECEL)
         d = V0 * dt - 0.5 * DECEL * dt * dt
     return Vector((0.0, BALL_Y0 - d, BALL_R + LIFT)), d / BALL_R
+
+
+def head_at(t, t_imp):
+    """World position of the face centre during the stroke."""
+    m = Matrix.Translation(PIVOT) @ Matrix.Rotation(stroke_phi(t, t_imp), 4, AXIS) @ Matrix.Translation(-PIVOT)
+    return m @ (FACE_C + Vector((0, 0, LIFT)))
+
+
+def lights_off(*names):
+    for n in names:
+        light(n, (0, 0, 1), (0, 0, 0), 0)
 
 
 # ------------------------------------------------------------------ shots
 def pose_reveal(t, a, b):
     u = lin(t, a, b)
     show()
+    target_line(0)
     ROOT.matrix_world = STAND
     floor_pool(0.0, 0.03, 0.14, 0.45)
     backdrop((0.25, 2.2, 0.35), 0.0)
@@ -406,14 +470,13 @@ def pose_reveal(t, a, b):
     sx = lerp(-0.40, 0.40, ease_io(lin(t, 1.4, 5.8)))
     light("sweep", (sx, -0.02, 0.32), (sx * 0.25, 0.03, 0.0), 45 * ease(lin(t, 1.0, 2.0)))
     light("key", (-0.28, -0.36, 0.46), HC, 38 * ease(lin(t, 2.6, 6.2)))
-    light("top", (0.0, 0.03, 0.45), HC, 0)
-    for n in ("fill", "rake", "spot"):
-        light(n, (0, 0, 1), (0, 0, 0), 0)
+    lights_off("top", "fill", "rake", "spot", "keyNF")
 
 
 def pose_face(t, a, b):
     u = lin(t, a, b)
     show()
+    target_line(0)
     ROOT.matrix_world = STAND
     floor_pool(0.0, 0.0, 0.10, 0.30)
     backdrop((0, 2.2, 0.3), 0.0)
@@ -423,13 +486,13 @@ def pose_face(t, a, b):
     light("rake", (-0.30, -0.07, 0.030), FACE_C, 140)
     light("top", (0.02, -0.10, 0.30), FACE_C, 22)
     light("rimR", (0.36, 0.32, 0.16), HC, 40)
-    for n in ("key", "fill", "rimL", "spot", "sweep"):
-        light(n, (0, 0, 1), (0, 0, 0), 0)
+    lights_off("key", "fill", "rimL", "spot", "sweep", "keyNF")
 
 
 def pose_sole(t, a, b):
     u = lin(t, a, b)
     show(club=False, floor=False)
+    target_line(0)
     backdrop((0, 2.2, 0.3), 0.0)
     centre = Vector((0.0, 0.0, 0.12))
     spin = math.radians(lerp(-32.0, 6.0, ease_io(u)))
@@ -444,27 +507,21 @@ def pose_sole(t, a, b):
     light("rimL", (-0.30, 0.25, 0.25), centre, 45)
     light("rimR", (0.30, 0.25, 0.20), centre, 45)
     light("fill", (0.25, -0.35, 0.05), centre, 4)
-    for n in ("key", "rake", "spot"):
-        light(n, (0, 0, 1), (0, 0, 0), 0)
-
-
-def head_at(t):
-    """World position of the face centre during the stroke."""
-    m = Matrix.Translation(PIVOT) @ Matrix.Rotation(stroke_phi(t), 4, AXIS) @ Matrix.Translation(-PIVOT)
-    return m @ (FACE_C + Vector((0, 0, LIFT)))
+    lights_off("key", "rake", "spot", "keyNF")
 
 
 def pose_stroke(t, a, b):
     show(ball=True)
+    target_line(0)
     floor_pool(0.0, -0.05, 0.16, 0.50)
     backdrop((0, 2.2, 0.3), 0.0)
-    ROOT.matrix_world = stroke_matrix(stroke_phi(t))
-    bc, roll = ball_state(t)
+    ROOT.matrix_world = stroke_matrix(stroke_phi(t, T_IMPACT))
+    bc, roll = ball_state(t, T_IMPACT)
     BALL.matrix_world = Matrix.Translation(bc) @ Matrix.Rotation(roll, 4, "X")
     # static low front view through impact, then a slow push toward the held finish
     push = ease_io(lin(t, T_IMPACT + 1.5, b))
     cam = vlerp((0.145, -0.66, 0.062), (0.11, -0.47, 0.050), push)
-    face = head_at(t)
+    face = head_at(t, T_IMPACT)
     tgt = vlerp((0.010, -0.02, 0.022), face + Vector((0.004, 0.0, 0.004)), push)
     d_ball = (bc - cam).length - 0.6 * BALL_R
     d_face = (face - cam).length
@@ -474,37 +531,103 @@ def pose_stroke(t, a, b):
     light("rimL", (-0.40, 0.35, 0.16), HC, 70)
     light("rimR", (0.42, 0.38, 0.18), HC, 55)
     light("top", (0.0, 0.05, 0.42), HC, 10)
-    for n in ("fill", "rake", "sweep", "spot"):
-        light(n, (0, 0, 1), (0, 0, 0), 0)
+    lights_off("fill", "rake", "sweep", "spot", "keyNF")
+
+
+def pose_center(t, a, b):
+    """High toe-side view: the shaft sits in the middle of the head, the head swings
+    back and through without turning, and the ball runs straight down the line."""
+    u = lin(t, a, b)
+    show(ball=True, club_in_reflections=False)
+    target_line(0.55 * ease(lin(t, a, a + 1.2)))
+    floor_pool(0.0, -0.22, 0.30, 0.85)
+    backdrop((0, 2.2, 0.3), 0.0)
+    ROOT.matrix_world = stroke_matrix(stroke_phi(t, T_IMPACT2))
+    bc, roll = ball_state(t, T_IMPACT2)
+    BALL.matrix_world = Matrix.Translation(bc) @ Matrix.Rotation(roll, 4, "X")
+    e = ease_io(u)
+    cam = vlerp((-0.17, 0.07, 0.50), (-0.17, -0.17, 0.52), e)
+    tgt = vlerp((0.0, 0.05, 0.0), (0.0, -0.19, 0.0), e)
+    camera(cam, tgt, lerp(46, 38, e), fstop=8.0)
+    light("keyNF", (0.10, -0.15, 0.90), (0, -0.15, 0.0), 85, size=(0.9, 0.6))
+    light("rimL", (-0.45, 0.45, 0.30), HC, 60)
+    light("rimR", (0.45, 0.45, 0.30), HC, 60)
+    light("top", (0.0, 0.03, 0.40), HC, 8)
+    lights_off("key", "fill", "rake", "sweep", "spot")
 
 
 def pose_stand(t, a, b):
+    """Set down, it stays upright on its own; the camera circles round behind the ball
+    to the golfer's view down the line (stepping back to check the alignment)."""
     u = lin(t, a, b)
-    show()
-    floor_pool(0.10, 0.034, 0.30, 1.10)
-    backdrop((-0.69, 2.6, 0.0), 0.06)
+    show(ball=True)
+    target_line(0.5 * ease(lin(t, a + 3.0, a + 5.0)))
+    floor_pool(0.05, -0.30, 0.55, 1.60)
     s = t - a                                     # just set down: a tiny damped rock, then still
     rock = math.radians(1.1) * math.exp(-2.6 * s) * math.cos(2 * math.pi * 1.25 * s) if s < 3.0 else 0.0
     pc = Vector((0.0, 0.034, 0.0))
     ROOT.matrix_world = Matrix.Translation(pc) @ Matrix.Rotation(rock, 4, "Y") @ Matrix.Translation(-pc) @ STAND
-    # orbit from a low close look at the head out to the whole putter standing alone
+    BALL.matrix_world = Matrix.Translation((0.0, BALL_Y0 - 0.004, BALL_R + LIFT))
     e = ease_io(u)
-    ang = math.radians(lerp(-116.0, -70.0, e))
-    rad = lerp(0.40, 1.30, e)
-    o = Vector((0.06, 0.034, 0.0))
-    loc = o + Vector((rad * math.cos(ang), rad * math.sin(ang), lerp(0.045, 0.38, e)))
-    # end framing: putter on the left third, room for the copy on the right
-    tgt = vlerp((0.0, 0.034, 0.028), (0.30, 0.034, 0.40), e)
-    camera(loc, tgt, lerp(50, 28, e), fstop=lerp(4.0, 9.0, e))
-    light("spot", (0.08, 0.034, 1.5), (0.08, 0.034, 0.0), 1800)
-    light("rimL", (-0.50, 0.60, 0.70), (0.1, 0.03, 0.40), 110, size=(0.035, 1.6))
-    light("rimR", (0.70, 0.55, 0.75), (0.1, 0.03, 0.40), 90, size=(0.035, 1.6))
-    light("key", (-0.45, -0.70, 0.55), (0.04, 0.03, 0.12), 120)
-    for n in ("fill", "rake", "sweep", "top"):
-        light(n, (0, 0, 1), (0, 0, 0), 0)
+    # orbit: low front-left -> round the toe -> behind the putter, rising to eye level
+    ang = math.radians(lerp(-116.0, -268.0, e))
+    rad = lerp(0.40, 0.82, e)
+    o = Vector((0.03, 0.03, 0.0))
+    loc = o + Vector((rad * math.cos(ang), rad * math.sin(ang), lerp(0.045, 0.80, e)))
+    tgt = vlerp((0.0, 0.034, 0.028), (0.03, -0.14, 0.06), e)
+    camera(loc, tgt, lerp(50, 40, e), fstop=lerp(4.0, 11.0, e))
+    # the "target": a soft light column far down the line
+    backdrop((0.0, -3.4, 0.0), 0.07 * ease(lin(t, a + 2.5, a + 5.5)), z0=-0.25, z1=0.45)
+    BACKDROP.rotation_euler = (math.radians(90), 0, 0)
+    light("spot", (0.03, -0.05, 1.5), (0.03, -0.05, 0.0), 1800)
+    light("rimL", (-0.50, -0.70, 0.70), (0.05, 0.03, 0.40), 100, size=(0.035, 1.6))
+    light("rimR", (0.60, -0.65, 0.75), (0.05, 0.03, 0.40), 90, size=(0.035, 1.6))
+    light("keyNF", (-0.45, -0.70, 0.55), (0.04, 0.03, 0.12), 110)
+    lights_off("key", "fill", "rake", "sweep", "top")
 
 
-POSES = {"reveal": pose_reveal, "face": pose_face, "sole": pose_sole, "stroke": pose_stroke, "stand": pose_stand}
+PICK_Y = 0.049                      # ball centre under the cutout arc (model: 49 mm from the face)
+PICK_Z_IN = 0.003                   # ball centre 3 mm above the sole once clicked in
+
+
+def pickup_lift(t):
+    """Height of the putter (sole) above the floor during the pick-up."""
+    down0, down1 = T_PICK - BAR, T_PICK                 # press down over the ball
+    up0, up1 = T_PICK + 0.35, T_PICK + 0.35 + BAR       # pause on the click, then lift
+    z_hi, z_in, z_up = 0.060, BALL_R + LIFT - PICK_Z_IN, 0.105
+    if t < down1:
+        return lerp(z_hi, z_in, ease_io(lin(t, down0, down1)) ** 1.15)
+    if t < up0:
+        return z_in
+    return lerp(z_in, z_up, ease_io(lin(t, up0, up1)))
+
+
+def pose_pickup(t, a, b):
+    u = lin(t, a, b)
+    show(ball=True)
+    target_line(0)
+    floor_pool(0.0, 0.05, 0.18, 0.55)
+    backdrop((0, 2.2, 0.3), 0.0)
+    z = pickup_lift(t)
+    ROOT.matrix_world = Matrix.Translation((0.0, 0.0, z - LIFT)) @ STAND
+    if t < T_PICK:                                       # ball waits on the floor
+        BALL.matrix_world = Matrix.Translation((0.0, PICK_Y, BALL_R + LIFT))
+    else:                                                # ...then travels with the head
+        BALL.matrix_world = Matrix.Translation((0.0, PICK_Y, z + PICK_Z_IN))
+    e = ease_io(u)
+    cam = vlerp((0.21, 0.40, 0.070), (0.17, 0.33, 0.120), e)
+    tgt = Vector((0.0, 0.045, max(0.040, z + 0.004)))
+    camera(cam, tgt, 60, fstop=5.6)
+    light("keyNF", (0.35, 0.45, 0.55), (0, 0.04, 0.05), 70)
+    light("rimL", (-0.45, -0.10, 0.25), (0, 0.04, 0.05), 60)
+    light("rimR", (0.40, -0.25, 0.30), (0, 0.04, 0.05), 50)
+    light("top", (0.0, 0.10, 0.50), (0, 0.04, 0.05), 10)
+    lights_off("key", "fill", "rake", "sweep", "spot")
+
+
+POSES = {"reveal": pose_reveal, "face": pose_face, "sole": pose_sole, "stroke": pose_stroke,
+         "center": pose_center, "stand": pose_stand, "pickup": pose_pickup}
+
 DEFAULT_RIM = (0.9, 0.035)
 
 

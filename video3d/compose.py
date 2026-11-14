@@ -21,12 +21,12 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 
 FPS = 24
-DURATION = 35.0
 BEAT = 0.45808
 BAR = 4 * BEAT
 PHRASE = 4 * BAR
-T_IMPACT = 2 * PHRASE + BAR          # 16.49 s
-T_LOGO = 4 * PHRASE                  # 29.317 s, the final hit
+T_IMPACT = 2 * PHRASE + BAR          # 16.49 s - front impact (featured sound)
+T_IMPACT2 = 3 * PHRASE + BAR         # 23.82 s - the overhead stroke
+T_LOGO = 6 * PHRASE                  # 43.975 s - the song's final hit
 LAST_3D = int(round(T_LOGO * FPS)) - 1
 
 MUSIC = os.path.join(HERE, "audio", "Stairway - Patrick Patrikios.mp3")
@@ -35,17 +35,23 @@ LOGO = os.path.join(ROOT, "grazr dp-301 putter photo", "logo.png")
 F_EN = os.path.join(HERE, "fonts", "Montserrat_400Regular.ttf")
 F_KR = os.path.join(HERE, "fonts", "Pretendard-Light.otf")
 
-# music edit: intro from a phrase start, spliced (30 ms before both transients) onto the song's final hit
-M_A0 = 14.869                        # phrase start  -> video 0.0
+# music edit: the whole calm intro (6 phrases), spliced 30 ms before both transients onto
+# the song's final hit, which rings out under the logo
+M_A0 = 0.211                         # first phrase  -> video 0.0
 M_A1 = 44.185 - 0.030                # just before the intro's closing hit
 M_B0 = 161.313 - 0.030               # just before the final hit (rings out to silence)
+DURATION = round((M_A1 - M_A0) + 5.75, 3)   # ~49.7 s
 HIT_PEAK = 0.303                     # peak inside Putter-sound.m4a after trimming 1.0 s
 
 # copy: (in, out, english, korean, layout)
 COPY = [
-    (8.15, 14.15, "PRECISION YOU CAN SEE", "한눈에 느껴지는 완성도", "bottom"),
-    (18.70, 21.75, "PURE, CRISP SOUND", "맑고 청량한 타구음", "bottom"),
-    (24.40, 28.95, "STANDS ON ITS OWN", "바닥에 놓으면, 스스로 섭니다", "right"),
+    (3.90, 6.95, "PRECISION YOU CAN SEE", "한눈에 느껴지는 완성도", "bottom"),
+    (7.80, 10.85, "100% FULL CNC MILLED", "헤드 전체를 초정밀 CNC로 깎아낸 정교한 밸런스와 일관된 반발력", "bottom"),
+    (11.45, 14.50, "FORGED SUS304 STAINLESS", "부식에 강한 단조 SUS304, 묵직하면서도 부드러운 타구감", "bottom"),
+    (18.60, 21.75, "PURE, CRISP SOUND", "맑고 청량한 타구음", "bottom"),
+    (25.20, 29.10, "CENTER SHAFT", "헤드 뒤틀림은 줄이고, 직진성은 높이고", "bottom"),
+    (31.70, 36.45, "STANDS ON ITS OWN", "받침 없이 스스로 서고, 한 걸음 물러나 정렬을 확인", "right"),
+    (39.90, 43.75, "PICKS UP THE BALL", "헤드로 공을 바로 집어 올립니다", "bottom"),
 ]
 
 
@@ -91,7 +97,7 @@ class Overlay:
             if layout == "bottom":
                 cx, top = W // 2, int(H * 0.845) - bh // 2
             else:                                    # right half, vertically centred
-                cx, top = int(W * 0.70), H // 2 - bh // 2
+                cx, top = int(W * 0.765), H // 2 - bh // 2
             items = [(m_en, cx - m_en.shape[1] // 2, top, 0.96),
                      (m_kr, cx - m_kr.shape[1] // 2, top + m_en.shape[0] + gap, 0.80)]
             self.blocks.append((t0, t1, items, bw, bh, layout))
@@ -110,7 +116,8 @@ class Overlay:
         for t0, t1, items, bw, bh, layout in self.blocks:
             if not (t0 <= t <= t1):
                 continue
-            a = ease((t - t0) / 0.9) * (1.0 - ease((t - (t1 - 0.7)) / 0.7))
+            fi, fo = min(0.9, (t1 - t0) / 4), min(0.7, (t1 - t0) / 5)
+            a = ease((t - t0) / fi) * (1.0 - ease((t - (t1 - fo)) / fo))
             if layout == "bottom":                  # soft lower-third shade keeps the copy legible
                 img *= (1.0 - 0.55 * a * self.shade)[:, None, None]
             drift = int(round((1.0 - ease((t - t0) / 1.6)) * 10 * self.k))
@@ -123,7 +130,7 @@ class Overlay:
 
     def logo(self, img, t):
         u = t - T_LOGO
-        a = ease(u / 1.0) * (1.0 - ease((t - 34.05) / 0.9))
+        a = ease(u / 1.0) * (1.0 - ease((t - (DURATION - 0.95)) / 0.9))
         if a <= 0:
             return
         x, y = self.logo_pos
@@ -156,18 +163,22 @@ def frame_path(frames, f):
 
 
 def audio_filter():
-    duck = "1-0.62*min(max((t-16.22)/0.2,0),1)*min(max((17.95-t)/0.85,0),1)"
+    def duck(t, depth):
+        return f"{depth}*min(max((t-{t - 0.27:.3f})/0.2,0),1)*min(max(({t + 1.46:.3f}-t)/0.85,0),1)"
+    vol = f"1-{duck(T_IMPACT, 0.62)}-{duck(T_IMPACT2, 0.25)}"
     a_len = M_A1 - M_A0
     b_len = DURATION - a_len + 0.3
+    d1 = int(round((T_IMPACT - HIT_PEAK) * 1000))
+    d2 = int(round((T_IMPACT2 - HIT_PEAK) * 1000))
     return (
         f"[1:a]atrim=start={M_A0}:end={M_A1},asetpts=PTS-STARTPTS,"
-        f"afade=t=in:st=0:d=0.25,afade=t=out:st={a_len - 0.015:.3f}:d=0.015[ma];"
+        f"afade=t=in:st=0:d=0.05,afade=t=out:st={a_len - 0.015:.3f}:d=0.015[ma];"
         f"[2:a]atrim=start={M_B0}:duration={b_len:.3f},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.012[mb];"
-        f"[ma][mb]concat=n=2:v=0:a=1,volume='{duck}':eval=frame,"
-        f"afade=t=out:st={DURATION - 1.1}:d=1.1[mus];"
-        f"[3:a]atrim=start=1.0,asetpts=PTS-STARTPTS,volume=1.25,"
-        f"adelay={int(round((T_IMPACT - HIT_PEAK) * 1000))}:all=1[hit];"
-        f"[mus][hit]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.89:level=false,"
+        f"[ma][mb]concat=n=2:v=0:a=1,volume='{vol}':eval=frame,"
+        f"afade=t=out:st={DURATION - 1.1:.3f}:d=1.1[mus];"
+        f"[3:a]atrim=start=1.0,asetpts=PTS-STARTPTS,volume=1.25,adelay={d1}:all=1[h1];"
+        f"[4:a]atrim=start=1.0,asetpts=PTS-STARTPTS,volume=0.70,adelay={d2}:all=1[h2];"
+        f"[mus][h1][h2]amix=inputs=3:duration=first:normalize=0,alimiter=limit=0.89:level=false,"
         f"atrim=end={DURATION}[aout]"
     )
 
@@ -184,7 +195,7 @@ def main():
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     cmd = ["ffmpeg", "-y", "-v", "error",
            "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
-           "-i", MUSIC, "-i", MUSIC, "-i", HIT,
+           "-i", MUSIC, "-i", MUSIC, "-i", HIT, "-i", HIT,
            "-filter_complex", audio_filter(),
            "-map", "0:v", "-map", "[aout]",
            "-c:v", "libx264", "-preset", "slow", "-crf", a.crf, "-pix_fmt", "yuv420p",
