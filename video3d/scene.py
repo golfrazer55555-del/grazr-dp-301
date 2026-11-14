@@ -94,8 +94,46 @@ for o in dst.objects:
     sc.collection.objects.link(o)
 ROOT = bpy.data.objects["GRAZR_DP301"]
 CLUB = [bpy.data.objects[n] for n in ("DP301_Shaft", "DP301_Shaft_Print", "DP301_Grip")]
+HEAD = bpy.data.objects["DP301_Head"]
 MM = 0.001
 LIFT = 0.0002                      # keep the sole off the floor plane (no coplanar faces)
+
+# Face milling finish. The grooves are the same black coat as the face, but they are CNC-cut,
+# so their floor and walls are a rougher finish than the smooth face: under a soft light they
+# catch it while the face itself stays black - the light lines of the product photo.
+# Mask (head mesh space, mm): 0.04-0.5 mm below the lofted face plane, inside the milled field.
+GROOVE_ROUGH = 0.62
+
+
+def groove_finish(m, rough):
+    nt = m.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+    base = bsdf.inputs["Roughness"].default_value
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(tc.outputs["Object"], sep.inputs[0])
+
+    def op(kind, *args):
+        n = nt.nodes.new("ShaderNodeMath")
+        n.operation = kind
+        for i, v in enumerate(args):
+            if isinstance(v, (int, float)):
+                n.inputs[i].default_value = v
+            else:
+                nt.links.new(v, n.inputs[i])
+        return n.outputs[0]
+
+    x, y, z = sep.outputs["X"], sep.outputs["Y"], sep.outputs["Z"]
+    depth = op("SUBTRACT", y, op("MULTIPLY", z, math.tan(math.radians(3.0))))
+    q = op("MAXIMUM", op("SUBTRACT", op("ABSOLUTE", x), 41.5), 0.0)       # stadium field: X_WING 41.5
+    dz = op("SUBTRACT", z, 12.5)
+    in_field = op("LESS_THAN", op("ADD", op("MULTIPLY", q, q), op("MULTIPLY", dz, dz)), 10.6 ** 2)
+    recessed = op("MULTIPLY", op("GREATER_THAN", depth, 0.04), op("LESS_THAN", depth, 0.5))
+    mask = op("MULTIPLY", recessed, in_field)
+    nt.links.new(op("MULTIPLY_ADD", mask, rough - base, base), bsdf.inputs["Roughness"])
+
+
+groove_finish(HEAD.material_slots[0].material, GROOVE_ROUGH)
 
 # model geometry we aim at (metres, standing pose)
 LIE = math.radians(74.0)
@@ -320,6 +358,12 @@ NO_FLOOR.collection_objects[0].light_linking.link_state = "EXCLUDE"
 add_light("keyNF", size=(0.5, 0.5))
 for nm in ("rimL", "rimR", "top", "sweep", "rake", "keyNF"):
     LIGHTS[nm].light_linking.receiver_collection = NO_FLOOR
+# face key: a softbox that lights only the head (the floor, ball and backdrop never see it)
+add_light("face", size=(0.6, 0.4))
+FACE_ONLY = bpy.data.collections.new("FaceOnly")
+for nm in ("DP301_Head", "DP301_Face_Mark"):
+    FACE_ONLY.objects.link(bpy.data.objects[nm])
+LIGHTS["face"].light_linking.receiver_collection = FACE_ONLY
 LIGHTS["spot"].data.spot_size = math.radians(34)
 LIGHTS["spot"].data.spot_blend = 0.85
 LIGHTS["spot"].data.shadow_soft_size = 0.15
@@ -454,6 +498,29 @@ def lights_off(*names):
         light(n, (0, 0, 1), (0, 0, 0), 0)
 
 
+FACE_N = Vector((0.0, -math.cos(math.radians(3.0)), math.sin(math.radians(3.0))))   # lofted face, mesh space
+FACE_C_MM = Vector((0.0, 0.0, 12.5))
+# Each shot aims its face key for one reference moment and then leaves it in place, so as the
+# camera (or the swinging head) moves, the light drifts across the grooves like a real softbox.
+FACE_REF_T = {"reveal": 5.0, "face": PHRASE + BAR, "stroke": T_IMPACT, "stand": 4 * PHRASE + 0.6}
+_face_ref = None                     # (camera location, head matrix) at the shot's reference time
+
+
+def face_key(power, off=55.0, side=0.0, dist=0.5):
+    """Softbox `off` degrees above the direction the smooth face mirrors the camera into:
+    the face does not reflect it (stays black) but the rougher grooves do - light lines on black."""
+    if _face_ref is None:
+        return
+    cam, head = _face_ref
+    n = (head.to_3x3().normalized() @ FACE_N).normalized()
+    c = head @ FACE_C_MM
+    v = (cam - c).normalized()
+    r = (2.0 * n.dot(v) * n - v).normalized()
+    r = Matrix.Rotation(math.radians(off), 3, r.cross(Vector((0, 0, 1))).normalized()) @ r
+    r = Matrix.Rotation(math.radians(side), 3, "Z") @ r
+    light("face", c + r * dist, c, power)
+
+
 # ------------------------------------------------------------------ shots
 def pose_reveal(t, a, b):
     u = lin(t, a, b)
@@ -470,6 +537,7 @@ def pose_reveal(t, a, b):
     sx = lerp(-0.40, 0.40, ease_io(lin(t, 1.4, 5.8)))
     light("sweep", (sx, -0.02, 0.32), (sx * 0.25, 0.03, 0.0), 45 * ease(lin(t, 1.0, 2.0)))
     light("key", (-0.28, -0.36, 0.46), HC, 38 * ease(lin(t, 2.6, 6.2)))
+    face_key(200 * ease(lin(t, 1.8, 5.2)))
     lights_off("top", "fill", "rake", "spot", "keyNF")
 
 
@@ -483,10 +551,9 @@ def pose_face(t, a, b):
     x = lerp(-0.036, 0.030, ease_io(u))           # slow slide from the toe to the GR mark
     loc = Vector((x, -0.135, 0.034))
     camera(loc, (x + 0.004, 0.0, 0.0115), 100, fstop=8.0, focus=0.137)
-    light("rake", (-0.30, -0.07, 0.030), FACE_C, 140)
-    light("top", (0.02, -0.10, 0.30), FACE_C, 22)
+    face_key(260, side=lerp(-14.0, 14.0, ease_io(u)))     # the softbox drifts slowly across the pattern
     light("rimR", (0.36, 0.32, 0.16), HC, 40)
-    lights_off("key", "fill", "rimL", "spot", "sweep", "keyNF")
+    lights_off("key", "fill", "rimL", "spot", "sweep", "keyNF", "rake", "top")
 
 
 def pose_sole(t, a, b):
@@ -526,11 +593,13 @@ def pose_stroke(t, a, b):
     d_ball = (bc - cam).length - 0.6 * BALL_R
     d_face = (face - cam).length
     rack = ease(lin(t, T_IMPACT + 1.5, T_IMPACT + 2.4))
-    camera(cam, tgt, 85, fstop=5.6, focus=lerp(d_ball, d_face, rack))
+    # f/11 focused between the ball and the face: both sharp, so the milling reads at impact too
+    camera(cam, tgt, 85, fstop=11.0, focus=lerp(0.5 * (d_ball + d_face), d_face, rack))
     light("key", (0.42, -0.30, 0.95), (0, -0.05, 0.0), 70)
     light("rimL", (-0.40, 0.35, 0.16), HC, 70)
     light("rimR", (0.42, 0.38, 0.18), HC, 55)
     light("top", (0.0, 0.05, 0.42), HC, 10)
+    face_key(260)
     lights_off("fill", "rake", "sweep", "spot", "keyNF")
 
 
@@ -583,6 +652,7 @@ def pose_stand(t, a, b):
     light("rimL", (-0.50, -0.70, 0.70), (0.05, 0.03, 0.40), 100, size=(0.035, 1.6))
     light("rimR", (0.60, -0.65, 0.75), (0.05, 0.03, 0.40), 90, size=(0.035, 1.6))
     light("keyNF", (-0.45, -0.70, 0.55), (0.04, 0.03, 0.12), 110)
+    face_key(220 * (1.0 - ease(lin(t, a + 3.0, a + 4.6))))     # until the camera has passed the toe
     lights_off("key", "fill", "rake", "sweep", "top")
 
 
@@ -632,9 +702,15 @@ DEFAULT_RIM = (0.9, 0.035)
 
 
 def pose(t):
+    global _face_ref
     name, a, b = shot_at(t)
     for nm in ("rimL", "rimR"):
         LIGHTS[nm].data.size, LIGHTS[nm].data.size_y = DEFAULT_RIM
+    lights_off("face")
+    _face_ref = None
+    if name in FACE_REF_T:                       # where the camera and head are at the reference moment
+        POSES[name](FACE_REF_T[name], a, b)
+        _face_ref = (CAM.location.copy(), ROOT.matrix_world.copy())
     POSES[name](t, a, b)
     return name
 
