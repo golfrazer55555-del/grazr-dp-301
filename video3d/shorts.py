@@ -1,6 +1,7 @@
 """Feature short clips (16:9) cut from the GRAZR DP-301 film, plus a thumbnail for each.
 
   python3 video3d/shorts.py --frames video3d/frames --film video3d/out/GRAZR_DP-301_film.mp4 --out video3d/out/shorts
+  python3 -c "import sys; sys.path.insert(0, 'video3d'); import shorts; shorts.make_film_thumb('video3d/frames', 'video3d/out/GRAZR_DP-301_film_thumb.jpg')"   # full-film thumbnail
 
 Each clip is one feature section of the film (cut on the music's bar lines) followed by the
 logo end card on the song's final hit. Picture comes from the rendered PNG frames (no re-encode
@@ -117,3 +118,24 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def make_film_thumb(frames, out, n=150):
+    """Thumbnail for the full film: hero reveal frame, logo mark, headline."""
+    img = np.asarray(Image.open(C.frame_path(frames, n)).convert("RGB"), np.float32) / 255.0
+    yy = np.linspace(0, 1, 1080, dtype=np.float32)[:, None, None]
+    img = img * (1.0 - 0.8 * np.clip((yy - 0.58) / 0.32, 0, 1) ** 1.3)
+    im = Image.fromarray((np.clip(img, 0, 1) * 255 + 0.5).astype(np.uint8))
+    lg = Image.open(C.LOGO).convert("RGBA")
+    lg = lg.crop(lg.getchannel("A").getbbox())
+    lg = lg.resize((int(lg.width * 150 / lg.height), 150), Image.LANCZOS)
+    im.paste(lg, (70, 60), lg)
+    d = ImageDraw.Draw(im)
+    head = "헤드 전체를 깎아 만든 퍼터"
+    f_kr = ImageFont.truetype(F_KR_B, 104)
+    w = d.textlength(head, font=f_kr)
+    d.text(((1920 - w) / 2, 850), head, font=f_kr, fill=(245, 245, 245))
+    sub = C.tracked("GRAZR DP-301  ·  100% FULL CNC MILLED", ImageFont.truetype(F_EN_M, 36), 9)
+    im.paste((215, 215, 215), ((1920 - sub.width) // 2, 790), sub)
+    im.resize((1280, 720), Image.LANCZOS).save(out, quality=92)
+    print(out)
