@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="{{ t.lang }}" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{% block title %}{{ t.title }}{% endblock %}</title>
+<meta name="description" content="{% block description %}{{ t.description }}{% endblock %}">
+<meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="dark">
+{% if not site_url %}<meta name="robots" content="noindex">{% endif %}
+{% if site_url %}<link rel="canonical" href="{{ site_url }}{{ path }}">
+<link rel="alternate" hreflang="ko" href="{{ site_url }}/">
+<link rel="alternate" hreflang="en" href="{{ site_url }}/en/">
+<link rel="alternate" hreflang="x-default" href="{{ site_url }}/">{% endif %}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="GRAZR">
+<meta property="og:title" content="{{ self.title() }}">
+<meta property="og:description" content="{{ self.description() }}">
+<meta property="og:locale" content="{{ 'ko_KR' if t.lang == 'ko' else 'en_US' }}">
+{% if site_url %}<meta property="og:url" content="{{ site_url }}{{ path }}">
+<meta property="og:image" content="{{ site_url }}/media/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">{% endif %}
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+{% for f in preload_fonts %}<link rel="preload" href="{{ f }}" as="font" type="font/woff2" crossorigin>
+{% endfor %}<link rel="stylesheet" href="/assets/css/fonts.css?v={{ v.fonts }}">
+<link rel="stylesheet" href="/assets/css/site.css?v={{ v.css }}">
+{% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+<a class="skip" href="#main">{{ '본문으로 건너뛰기' if t.lang == 'ko' else 'Skip to content' }}</a>
+<header class="site-header" data-header>
+  <div class="wrap header-inner">
+    <a class="brand" href="{{ '/' if t.lang == 'ko' else '/en/' }}" aria-label="GRAZR">
+      <img src="/assets/img/logo-lockup.png" alt="GRAZR" width="85" height="32">
+    </a>
+    {% block nav %}
+    <nav class="nav" aria-label="{{ '주요 메뉴' if t.lang == 'ko' else 'Main' }}">
+      {% for label, href in t.nav %}<a href="{{ href }}">{{ label }}</a>{% endfor %}
+    </nav>
+    {% endblock %}
+    <div class="header-actions">
+      <a class="lang" href="{{ t.lang_switch[1] }}" hreflang="{{ 'en' if t.lang == 'ko' else 'ko' }}">{{ t.lang_switch[0] }}</a>
+      {% block header_cta %}<a class="btn btn-small" href="{{ t.nav_cta[1] }}">{{ t.nav_cta[0] }}</a>{% endblock %}
+    </div>
+  </div>
+</header>
+<main id="main">
+{% block main %}{% endblock %}
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-top">
+      <img class="footer-logo" src="/assets/img/logo-stacked.png" alt="GRAZR" width="70" height="56" loading="lazy">
+      <div class="footer-links">
+        <a href="{{ t.footer_terms[1] }}">{{ t.footer_terms[0] }}</a>
+        <a href="{{ t.footer_privacy[1] }}"><strong>{{ t.footer_privacy[0] }}</strong></a>
+        <a href="{{ youtube_url }}" target="_blank" rel="noopener">{{ t.youtube }}</a>
+      </div>
+    </div>
+    <dl class="biz">
+      {% for key in ("name", "ceo", "biz_no", "mail_order_no", "address", "phone", "email", "hosting") %}
+      <div><dt>{{ t.biz_labels[key] }}</dt><dd>{% if key == "phone" %}{% if t.lang == 'ko' %}<a href="tel:{{ biz.phone }}">{{ biz.phone }}</a>{% else %}<a href="tel:{{ biz.phone_intl }}">{{ biz.phone_intl }}</a>{% endif %}{% elif key == "email" and biz.email %}<a href="mailto:{{ biz.email }}">{{ biz.email }}</a>{% else %}{{ val(biz[key]) }}{% endif %}</dd></div>
+      {% endfor %}
+    </dl>
+    <p class="copy">© {{ year }} GRAZR. All rights reserved.</p>
+  </div>
+</footer>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }} | GRAZR{% endblock %}
+{% block description %}GRAZR {{ page_title }}{% endblock %}
+{% block body_class %}page-legal{% endblock %}
+{% block nav %}{% endblock %}
+{% block header_cta %}<a class="btn btn-small btn-ghost" href="/">홈으로</a>{% endblock %}
+{% block main %}
+<article class="legal wrap narrow">
+  <p class="eyebrow">GRAZR</p>
+  <h1 class="h2">{{ page_title }}</h1>
+  {% if intro %}<p class="legal-intro">{{ fill(intro) }}</p>{% endif %}
+  {% for title, blocks in sections %}
+  <section>
+    <h2>{{ title }}</h2>
+    {% for b in blocks %}
+      {% if b is string %}<p>{{ fill(b) }}</p>
+      {% elif b[0] == "ul" %}<ul>{% for li in b[1] %}<li>{{ fill(li) }}</li>{% endfor %}</ul>
+      {% elif b[0] == "table" %}<div class="table-wrap"><table><thead><tr>{% for h in b[1] %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+        <tbody>{% for row in b[2] %}<tr>{% for c in row %}<td>{{ fill(c) }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+      {% else %}<ol>{% for li in b %}<li>{{ fill(li) }}</li>{% endfor %}</ol>
+      {% endif %}
+    {% endfor %}
+  </section>
+  {% endfor %}
+</article>
+{% endblock %}
