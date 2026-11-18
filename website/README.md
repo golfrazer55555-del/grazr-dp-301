@@ -36,7 +36,7 @@ python3 website/tools/make_media.py --only photos                       # 사진
 1. Cloudflare 대시보드 → **Workers & Pages** → **Create application** → **Import a repository** (GitHub 연결)
 2. 저장소 `grazr-dp-301` 선택
 3. 설정: Project name `grazr`, **Root directory** `website`, Build command 비움, Deploy command `npx wrangler deploy` (기본값)
-4. 배포 브랜치(Production branch)를 사이트 작업 브랜치로 지정
+4. 배포 브랜치(Settings → Builds → Production branch)를 `claude/grazer-dp301-putter-video-vkn9b1`로 지정
 5. 배포가 끝나면 `grazr.<계정이름>.workers.dev` 주소가 생깁니다. 이후에는 브랜치에 올릴 때마다 자동 배포됩니다.
 
 ## 도메인 연결
