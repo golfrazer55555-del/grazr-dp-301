@@ -80,7 +80,7 @@ def make_thumb(a, name, n, head, sub):
     V = H > W
     yy = np.linspace(0, 1, H, dtype=np.float32)[:, None, None]
     if V:   # Reels/Shorts cover: text inside the centre 3:4 the profile grid shows
-        img = img * (1.0 - 0.8 * np.exp(-((yy - 0.66) / 0.12) ** 2))
+        img = img * (1.0 - 0.8 * np.exp(-((yy - 0.74) / 0.12) ** 2))
     else:
         img = img * (1.0 - 0.75 * np.clip((yy - 0.55) / 0.35, 0, 1) ** 1.3)
     im = Image.fromarray((np.clip(img, 0, 1) * 255 + 0.5).astype(np.uint8))
@@ -89,7 +89,7 @@ def make_thumb(a, name, n, head, sub):
     f_en = ImageFont.truetype(F_EN_M, 34 if V else 38)
     f_br = ImageFont.truetype(F_EN_M, 30)
     lines = C.wrap(head, f_kr, 0, int(W * 0.88)) if V else [head]
-    y = int(H * 0.62) if V else 840
+    y = int(H * 0.70) if V else 840
     sub_m = C.tracked(sub, f_en, 10)
     im.paste((215, 215, 215), ((W - sub_m.width) // 2, y - 60), sub_m)
     for line in lines:
@@ -152,4 +152,28 @@ def make_film_thumb(frames, out, n=150):
     sub = C.tracked("GRAZR DP-301  ·  100% FULL CNC MILLED", ImageFont.truetype(F_EN_M, 36), 9)
     im.paste((215, 215, 215), ((1920 - sub.width) // 2, 790), sub)
     im.resize((1280, 720), Image.LANCZOS).save(out, quality=92)
+    print(out)
+
+
+def make_film_thumb_v(frames, out, n=150):
+    """9:16 Reels cover for the full vertical film; text kept inside the centre 3:4 crop."""
+    W_, H_ = 1080, 1920
+    img = np.asarray(Image.open(C.frame_path(frames, n)).convert("RGB"), np.float32) / 255.0
+    yy = np.linspace(0, 1, H_, dtype=np.float32)[:, None, None]
+    img = img * (1.0 - 0.8 * np.exp(-((yy - 0.66) / 0.12) ** 2))
+    im = Image.fromarray((np.clip(img, 0, 1) * 255 + 0.5).astype(np.uint8))
+    lg = Image.open(C.LOGO).convert("RGBA")
+    lg = lg.crop(lg.getchannel("A").getbbox())
+    lg = lg.resize((int(lg.width * 120 / lg.height), 120), Image.LANCZOS)
+    im.paste(lg, ((W_ - lg.width) // 2, int(H_ * 0.2)), lg)
+    d = ImageDraw.Draw(im)
+    f_kr = ImageFont.truetype(F_KR_B, 88)
+    sub = C.tracked("100% FULL CNC MILLED", ImageFont.truetype(F_EN_M, 34), 10)
+    y = int(H_ * 0.62)
+    im.paste((215, 215, 215), ((W_ - sub.width) // 2, y - 60), sub)
+    for line in ("헤드 전체를", "깎아 만든 퍼터"):
+        w = d.textlength(line, font=f_kr)
+        d.text(((W_ - w) / 2, y), line, font=f_kr, fill=(245, 245, 245))
+        y += 112
+    im.save(out, quality=92)
     print(out)
