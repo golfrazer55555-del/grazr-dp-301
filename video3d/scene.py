@@ -617,7 +617,8 @@ def pose_center(t, a, b):
     e = ease_io(u)
     cam = vlerp((-0.17, 0.07, 0.50), (-0.17, -0.17, 0.52), e)
     tgt = vlerp((0.0, 0.05, 0.0), (0.0, -0.19, 0.0), e)
-    camera(cam, tgt, lerp(46, 38, e), fstop=8.0)
+    # 9:16: roll the camera a quarter turn so the target line runs up the tall frame
+    camera(cam, tgt, lerp(46, 38, e), fstop=8.0, roll=CENTER_ROLL if VERTICAL else 0.0)
     light("keyNF", (0.10, -0.15, 0.90), (0, -0.15, 0.0), 85, size=(0.9, 0.6))
     light("rimL", (-0.45, 0.45, 0.30), HC, 60)
     light("rimR", (0.45, 0.45, 0.30), HC, 60)
@@ -724,11 +725,24 @@ QUALITY = {
 }
 
 
-def setup_render(q):
+# 9:16 version (Shorts / Reels): the same cameras, the frame's width keeps VERTICAL_K of the 16:9
+# horizontal field of view and it simply sees more above and below (sensor fitted to the width).
+VERTICAL_K = 0.88
+VERTICAL = False
+CENTER_ROLL = -90.0
+
+
+def setup_render(q, vertical=False):
     c = QUALITY[q]
     r = sc.render
     r.engine = "CYCLES"
     r.resolution_x, r.resolution_y = c["res"]
+    global VERTICAL
+    VERTICAL = vertical
+    if vertical:
+        r.resolution_x, r.resolution_y = r.resolution_y, r.resolution_x
+        cam_data.sensor_fit = "HORIZONTAL"
+        cam_data.sensor_width = 36.0 * VERTICAL_K
     r.resolution_percentage = 100
     r.use_persistent_data = True
     r.film_transparent = False
@@ -776,9 +790,10 @@ def main():
     ap.add_argument("--step", type=int, default=1)
     ap.add_argument("--stills")
     ap.add_argument("--skip-existing", action="store_true")
+    ap.add_argument("--vertical", action="store_true", help="9:16 frames (1080x1920) for Shorts / Reels")
     a = ap.parse_args(argv)
     os.makedirs(a.out, exist_ok=True)
-    setup_render(a.quality)
+    setup_render(a.quality, a.vertical)
     if a.stills:
         for t in (float(x) for x in a.stills.split(",")):
             pose(t)
