@@ -3,7 +3,7 @@
 None = not provided yet: the page shows a visible "확인 필요" marker in its place.
 """
 
-SITE_URL = None            # e.g. "https://grazr.co.kr" once the domain is bought (canonical, og:image, sitemap)
+SITE_URL = "https://grazr.co.kr"
 STORE_URL = "https://smartstore.naver.com/duddy/products/11585263659"
 YOUTUBE_URL = "https://www.youtube.com/@GRAZR-OFFICIAL"
 PRICE_KRW = 385000
@@ -48,7 +48,7 @@ NOTICE = [
     ("품질보증기준", "관련 법령 및 소비자분쟁해결기준(공정거래위원회 고시)에 따릅니다."),
     ("A/S 책임자와 전화번호", "053-962-5531"),
 ]
-TERMS_EFFECTIVE = None     # 시행일, e.g. "2026년 12월 1일" (the day the site goes public)
+TERMS_EFFECTIVE = "2026년 11월 19일"     # 시행일 (사이트 공개일)
 
 # shaft options (same price)
 OPTIONS = [
