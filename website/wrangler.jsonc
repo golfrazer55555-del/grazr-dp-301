@@ -14,9 +14,8 @@
   },
   "vars": {
     "PRICE_KRW": "385000",
-    "MAX_QTY": "3",
-    // Toss Payments public documentation test key (no real charges). For live payments set the
-    // live secret key as an encrypted secret named TOSS_SECRET_KEY in the Cloudflare dashboard.
-    "TOSS_TEST_SECRET_KEY": "test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6"
+    "MAX_QTY": "3"
+    // The Toss Payments widget secret key (test_gsk_... now, live_gsk_... after approval) is an
+    // encrypted secret named TOSS_SECRET_KEY set in the Cloudflare dashboard, never in this file.
   }
 }

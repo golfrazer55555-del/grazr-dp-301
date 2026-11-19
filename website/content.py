@@ -11,7 +11,7 @@ DIRECT_PAY = False         # show the "사이트에서 바로 결제" button on 
 # Toss Payments (결제위젯). "test" = no real charge; switch to "live" with the live client key after approval
 # and set the live secret key as the Cloudflare secret TOSS_SECRET_KEY (never in this file).
 PAY_MODE = "test"
-TOSS_CLIENT_KEY = "test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm"   # public docs test key (widget)
+TOSS_CLIENT_KEY = "test_gck_c19zorzVYIhQ5vHDsvJsma2srajdSvzm0m"   # 아이엔골프 결제위젯 테스트 클라이언트 키 (public)
 
 BUSINESS = {
     "name": "아이엔골프",                # 상호

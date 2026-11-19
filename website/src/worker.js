@@ -21,7 +21,7 @@ export default {
     if (!Number.isInteger(amount) || amount < price || amount % price !== 0 || amount / price > maxQty)
       return json({ code: "INVALID_AMOUNT", message: "주문 금액이 올바르지 않습니다." }, 400);
 
-    const secret = env.TOSS_SECRET_KEY || env.TOSS_TEST_SECRET_KEY;
+    const secret = env.TOSS_SECRET_KEY;
     if (!secret) return json({ code: "NOT_CONFIGURED", message: "결제 설정이 아직 완료되지 않았습니다." }, 500);
 
     const r = await fetch("https://api.tosspayments.com/v1/payments/confirm", {
