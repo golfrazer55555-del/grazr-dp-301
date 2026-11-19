@@ -6,7 +6,7 @@
   var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var SHAFT = {
     black: { color: [0.004, 0.004, 0.0045, 1], metallic: 0, roughness: 0.12, clearcoat: 1 },
-    silver: { color: [0.22, 0.23, 0.24, 1], metallic: 0.2, roughness: 0.5, clearcoat: 0 }
+    silver: { color: [0.08, 0.083, 0.088, 1], metallic: 0.3, roughness: 0.6, clearcoat: 0 }
   };
   var shaftState = "black";
 

@@ -31,8 +31,8 @@ SHAFT = bpy.data.materials["Graphite_Shaft_GlossBlack"].node_tree.nodes["Princip
 FINISH = {
     "black": {"Base Color": (0.004, 0.004, 0.004, 1), "Metallic": 0.0, "Roughness": 0.12,
               "Coat Weight": 1.0, "Coat Roughness": 0.03},
-    "silver": {"Base Color": (0.60, 0.62, 0.65, 1), "Metallic": 0.9, "Roughness": 0.34,
-               "Coat Weight": 0.25, "Coat Roughness": 0.22},
+    "silver": {"Base Color": (0.13, 0.135, 0.145, 1), "Metallic": 0.5, "Roughness": 0.5,
+               "Coat Weight": 0.0, "Coat Roughness": 0.22},
 }
 BLACK_COAT_ROUGH = SHAFT.inputs["Coat Roughness"].default_value
 FINISH["black"]["Coat Roughness"] = BLACK_COAT_ROUGH
