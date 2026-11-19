@@ -40,6 +40,7 @@ python3 website/tools/make_media.py --only photos                       # 사진
 5. 배포가 끝나면 `grazr.<계정이름>.workers.dev` 주소가 생깁니다. 이후에는 브랜치에 올릴 때마다 자동 배포됩니다.
 
 ## 도메인 연결
+- grazr.co.kr: 가비아 등록(2026-11-19, 1년), 네임서버 Cloudflare(david / rosa). 가비아 **안전잠금 켜짐** → 네임서버 등 도메인 정보를 바꿀 때는 가비아에서 잠금을 먼저 풀어야 합니다.
 - Cloudflare에서 산 도메인: Worker → **Settings → Domains & Routes → Add → Custom domain**에 도메인 입력
 - 가비아에서 산 도메인: Cloudflare **Add a domain**으로 도메인 추가 → 안내되는 네임서버 2개를 가비아 **도메인 관리 → 네임서버 설정**에 입력 → 연결되면 위와 같이 Custom domain 추가
 
