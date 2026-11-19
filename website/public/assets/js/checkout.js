@@ -81,7 +81,8 @@
       var orderId = "GRAZR-" + Date.now().toString(36).toUpperCase() + "-" + Math.random().toString(36).slice(2, 8).toUpperCase();
       var orderName = "GRAZR DP-301 " + label + (q > 1 ? " x" + q : "");
       var address = "(" + value("zip") + ") " + value("addr1") + " " + value("addr2");
-      store("grazr-order-" + orderId, { orderName: orderName, name: value("name"), address: address });
+      store("grazr-order-" + orderId, { orderName: orderName, name: value("name"), address: address,
+        phone: value("phone").replace(/[^0-9]/g, ""), email: value("email"), memo: value("memo"), option: label, qty: String(q) });
       payBtn.disabled = true;
       widgets.requestPayment({
         orderId: orderId,
@@ -118,7 +119,7 @@
     }
     function show(r) {
       title.textContent = "주문이 완료됐습니다";
-      msg.textContent = "결제 후 3일 이내에 한진택배로 발송합니다. 주문 확인 메일과 영수증을 확인해 주세요.";
+      msg.textContent = "결제 후 3일 이내에 한진택배로 발송합니다. 결제 영수증은 아래에서 확인하실 수 있습니다.";
       var o = load("grazr-order-" + orderId) || {};
       detail.hidden = false;
       row("주문번호", r.orderId);
@@ -138,7 +139,7 @@
     if (done) { show(done); return; }
     fetch("/api/confirm", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paymentKey: paymentKey, orderId: orderId, amount: Number(amount) })
+      body: JSON.stringify({ paymentKey: paymentKey, orderId: orderId, amount: Number(amount), shipping: load("grazr-order-" + orderId) || {} })
     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (x) {
         if (!x.ok) throw x.j;
