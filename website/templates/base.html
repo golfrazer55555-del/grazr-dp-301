@@ -9,7 +9,7 @@
 {% if path == "/" %}<meta name="naver-site-verification" content="7c1402c18424684274d93a0e81f972353e1c14c5">
 <meta name="google-site-verification" content="Od2Hvk4OsdmuVAENq4mO63fqK3hxPG4hZdDSP4xlpm8">{% endif %}
 <meta name="color-scheme" content="dark">
-{% if not site_url %}<meta name="robots" content="noindex">{% endif %}
+{% if not site_url or noindex %}<meta name="robots" content="noindex">{% endif %}
 {% if site_url %}<link rel="canonical" href="{{ site_url }}{{ path }}">
 <link rel="alternate" hreflang="ko" href="{{ site_url }}/">
 <link rel="alternate" hreflang="en" href="{{ site_url }}/en/">

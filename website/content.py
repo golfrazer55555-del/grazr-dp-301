@@ -7,7 +7,11 @@ SITE_URL = "https://grazr.co.kr"
 STORE_URL = "https://smartstore.naver.com/duddy/products/11585263659"
 YOUTUBE_URL = "https://www.youtube.com/@GRAZR-OFFICIAL"
 PRICE_KRW = 385000
-DIRECT_PAY = False         # turn on once Toss Payments is approved and wired up
+DIRECT_PAY = False         # show the "사이트에서 바로 결제" button on the home page (after Toss approval)
+# Toss Payments (결제위젯). "test" = no real charge; switch to "live" with the live client key after approval
+# and set the live secret key as the Cloudflare secret TOSS_SECRET_KEY (never in this file).
+PAY_MODE = "test"
+TOSS_CLIENT_KEY = "test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm"   # public docs test key (widget)
 
 BUSINESS = {
     "name": "아이엔골프",                # 상호

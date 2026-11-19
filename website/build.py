@@ -136,7 +136,8 @@ def main():
     hero_frames = len([f for f in os.listdir(os.path.join(PUB, "media", "hero", "1600")) if f.endswith(".webp")])
     common = dict(site_url=C.SITE_URL, store_url=C.STORE_URL, youtube_url=C.YOUTUBE_URL, biz=C.BUSINESS,
                   options=C.OPTIONS, shipping=C.SHIPPING, notice=C.NOTICE, direct_pay=C.DIRECT_PAY,
-                  hero_frames=hero_frames, year=datetime.date.today().year, fill=fill)
+                  hero_frames=hero_frames, year=datetime.date.today().year, fill=fill,
+                  price=C.PRICE_KRW, pay_mode=C.PAY_MODE, toss_client_key=C.TOSS_CLIENT_KEY)
 
     def render_all(preload, v):
         pages = []
@@ -147,9 +148,14 @@ def main():
             (C.KO, "/privacy/", "privacy/index.html",
              {"page_title": L.PRIVACY_TITLE, "intro": L.PRIVACY_INTRO, "sections": L.PRIVACY}),
             (C.KO, "/404", "404.html", {}),
+            (C.KO, "/checkout/", "checkout/index.html", {"tpl": "checkout.html", "noindex": True}),
+            (C.KO, "/checkout/success/", "checkout/success/index.html",
+             {"tpl": "checkout_result.html", "noindex": True, "result": "success"}),
+            (C.KO, "/checkout/fail/", "checkout/fail/index.html",
+             {"tpl": "checkout_result.html", "noindex": True, "result": "fail"}),
         ):
-            tpl = "index.html" if rel.endswith("index.html") and "page_title" not in extra else \
-                ("legal.html" if "page_title" in extra else "404.html")
+            tpl = extra.get("tpl") or ("index.html" if rel.endswith("index.html") and "page_title" not in extra else
+                                       ("legal.html" if "page_title" in extra else "404.html"))
             lang = t["lang"]
             ctx = dict(common, **extra, t=t, path=path, v=v, preload_fonts=preload,
                        val=lambda x, _l=lang: val(x, _l))
@@ -159,11 +165,12 @@ def main():
     # pass 1 renders the text so the fonts can be subset; pass 2 writes pages with the final font URLs
     css = open(os.path.join(PUB, "assets", "css", "site.css"), "rb").read()
     js = open(os.path.join(PUB, "assets", "js", "site.js"), "rb").read()
-    first = render_all([], {"css": "", "js": "", "fonts": ""})
+    co = open(os.path.join(PUB, "assets", "js", "checkout.js"), "rb").read()
+    first = render_all([], {"css": "", "js": "", "fonts": "", "co": ""})
     text = html.unescape("".join(p for _, p in first))
     preload = build_fonts(text)
     fonts_css = open(os.path.join(PUB, "assets", "css", "fonts.css"), "rb").read()
-    v = {"css": short_hash(css), "js": short_hash(js), "fonts": short_hash(fonts_css)}
+    v = {"css": short_hash(css), "js": short_hash(js), "fonts": short_hash(fonts_css), "co": short_hash(co)}
     for rel, page in render_all(preload, v):
         write(rel, re.sub(r"\n\s*\n+", "\n", page))
         print("page", rel)

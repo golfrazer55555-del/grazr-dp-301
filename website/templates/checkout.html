@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}주문하기 | GRAZR{% endblock %}
+{% block description %}GRAZR DP-301 주문하기{% endblock %}
+{% block body_class %}page-checkout{% endblock %}
+{% block nav %}{% endblock %}
+{% block header_cta %}<a class="btn btn-small btn-ghost" href="/#buy">돌아가기</a>{% endblock %}
+{% block main %}
+<section class="checkout wrap" data-checkout data-client-key="{{ toss_client_key }}" data-price="{{ price }}">
+  {% if pay_mode == "test" %}
+  <p class="test-banner"><strong>테스트 결제 화면</strong> 실제로 결제되거나 배송되지 않습니다. 구매는 <a href="{{ store_url }}" target="_blank" rel="noopener">네이버 스마트스토어</a>에서 해 주세요.</p>
+  {% endif %}
+  <h1 class="h2">주문하기</h1>
+  <div class="co-grid">
+    <form class="co-form" data-co-form novalidate>
+      <fieldset class="co-box">
+        <legend>상품</legend>
+        <div class="co-product">
+          {% for o in options %}<img class="co-thumb{% if loop.first %} is-on{% endif %}" data-buy-img="{{ o.key }}" src="/media/product/{{ o.img }}-640.webp" alt="" width="96" height="120">{% endfor %}
+          <div>
+            <p class="co-name">GRAZR DP-301 퍼터</p>
+            <p class="small muted">헤드커버 포함 · 오른손용 · 배송비 무료</p>
+            <p class="co-price">{{ '{:,}'.format(price) }}원</p>
+          </div>
+        </div>
+        <p class="co-label">길이 · 샤프트</p>
+        <div class="chips">
+          {% for o in options %}
+          <label class="chip"><input type="radio" name="shaft" value="{{ o.key }}" data-shaft-input data-label="{{ o.inch }}인치 {{ '블랙' if o.key == 'black' else '실버' }}"{% if loop.first %} checked{% endif %}>
+            <span><i class="swatch swatch-{{ o.key }}" aria-hidden="true"></i>{{ t.opt_long[o.key] }}</span></label>
+          {% endfor %}
+        </div>
+        <label class="co-field co-qty">수량
+          <select name="qty">{% for n in range(1, 4) %}<option value="{{ n }}">{{ n }}개</option>{% endfor %}</select>
+        </label>
+      </fieldset>
+
+      <fieldset class="co-box">
+        <legend>주문하시는 분 · 받는 분</legend>
+        <label class="co-field">이름<input name="name" autocomplete="name" required maxlength="40"></label>
+        <label class="co-field">휴대폰 번호<input name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="01012345678" required maxlength="13"></label>
+        <label class="co-field">이메일<input name="email" type="email" autocomplete="email" placeholder="주문 확인 메일을 받을 주소" required maxlength="100"></label>
+      </fieldset>
+
+      <fieldset class="co-box">
+        <legend>배송지</legend>
+        <div class="co-row">
+          <label class="co-field">우편번호<input name="zip" readonly required placeholder="주소 검색을 눌러 주세요"></label>
+          <button class="btn btn-ghost co-search" type="button" data-postcode>주소 검색</button>
+        </div>
+        <label class="co-field">주소<input name="addr1" readonly required></label>
+        <label class="co-field">상세 주소<input name="addr2" autocomplete="address-line2" maxlength="100" placeholder="동, 호수 등"></label>
+        <label class="co-field">배송 메모 (선택)<input name="memo" maxlength="100" placeholder="예: 문 앞에 놓아 주세요"></label>
+      </fieldset>
+
+      <fieldset class="co-box">
+        <legend>결제 수단</legend>
+        <div class="co-pay"><div id="payment-method"></div><div id="agreement"></div></div>
+      </fieldset>
+    </form>
+
+    <aside class="co-summary">
+      <dl class="kv">
+        <div><dt>상품 금액</dt><dd data-total>{{ '{:,}'.format(price) }}원</dd></div>
+        <div><dt>배송비</dt><dd>무료</dd></div>
+      </dl>
+      <p class="co-sum">결제 금액 <strong data-total>{{ '{:,}'.format(price) }}원</strong></p>
+      <label class="co-agree"><input type="checkbox" name="agree" form="none" data-agree>
+        <span>주문 내용을 확인했으며, <a href="/terms/" target="_blank">이용약관</a>과 배송을 위한 <a href="/privacy/" target="_blank">개인정보 수집·이용</a>(이름, 연락처, 이메일, 주소 · 5년 보관)에 동의합니다.</span></label>
+      <button class="btn btn-primary btn-block" type="button" data-pay disabled>결제하기</button>
+      <p class="co-error" data-co-error role="alert"></p>
+      <p class="small muted">교환·반품은 상품을 받은 날부터 7일 이내에 신청하실 수 있습니다. 문의 <a href="tel:{{ biz.phone }}">{{ biz.phone }}</a></p>
+    </aside>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}<script src="https://js.tosspayments.com/v2/standard"></script>
+<script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js" defer></script>
+<script src="/assets/js/checkout.js?v={{ v.co }}" defer></script>{% endblock %}

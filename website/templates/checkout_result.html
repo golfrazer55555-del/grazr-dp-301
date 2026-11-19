@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{{ '주문 완료' if result == 'success' else '결제 실패' }} | GRAZR{% endblock %}
+{% block description %}GRAZR 주문 결과{% endblock %}
+{% block body_class %}page-checkout{% endblock %}
+{% block nav %}{% endblock %}
+{% block header_cta %}<a class="btn btn-small btn-ghost" href="/">홈으로</a>{% endblock %}
+{% block main %}
+<section class="checkout co-result wrap narrow" data-result="{{ result }}">
+  <p class="eyebrow">ORDER</p>
+  <h1 class="h2" data-r-title>{{ '결제를 확인하고 있습니다' if result == 'success' else '결제가 완료되지 않았습니다' }}</h1>
+  <p class="body" data-r-msg>{% if result == 'success' %}잠시만 기다려 주세요. 이 창을 닫지 마세요.{% endif %}</p>
+  <dl class="kv" data-r-detail hidden></dl>
+  <p class="test-banner" data-r-test hidden><strong>테스트 결제</strong> 실제로 청구되거나 배송되지 않습니다.</p>
+  <div class="btn-row center">
+    <a class="btn btn-primary" href="/" data-r-home>홈으로</a>
+    <a class="btn btn-ghost" href="/checkout/" data-r-retry {% if result == 'success' %}hidden{% endif %}>다시 주문하기</a>
+  </div>
+  <p class="small muted">문의 <a href="tel:{{ biz.phone }}">{{ biz.phone }}</a>{% if biz.email %} · <a href="mailto:{{ biz.email }}">{{ biz.email }}</a>{% endif %}</p>
+</section>
+{% endblock %}
+{% block scripts %}<script src="/assets/js/checkout.js?v={{ v.co }}" defer></script>{% endblock %}
