@@ -78,10 +78,9 @@ def tracked(text, font, tracking, fill=255):
     return m.crop(m.getbbox())
 
 
-def wrap(text, font, tracking, max_w):
-    """Greedy word wrap for the Korean line (vertical layout)."""
+def _greedy(words, font, tracking, max_w):
     lines, cur = [], ""
-    for w in text.split(" "):
+    for w in words:
         t = (cur + " " + w).strip()
         if cur and tracked(t, font, tracking).width > max_w:
             lines.append(cur)
@@ -89,6 +88,19 @@ def wrap(text, font, tracking, max_w):
         else:
             cur = t
     return lines + [cur]
+
+
+def wrap(text, font, tracking, max_w):
+    """Word wrap for the Korean line (vertical layout): fewest lines, then as even as possible."""
+    words = text.split(" ")
+    lines = _greedy(words, font, tracking, max_w)
+    n, w = len(lines), max_w
+    while n > 1 and w > 40:               # shrink the box while the line count holds
+        trial = _greedy(words, font, tracking, w - 20)
+        if len(trial) != n:
+            break
+        lines, w = trial, w - 20
+    return lines
 
 
 def stack(masks, gap):
