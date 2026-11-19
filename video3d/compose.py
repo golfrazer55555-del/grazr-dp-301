@@ -78,24 +78,57 @@ def tracked(text, font, tracking, fill=255):
     return m.crop(m.getbbox())
 
 
+def wrap(text, font, tracking, max_w):
+    """Greedy word wrap for the Korean line (vertical layout)."""
+    lines, cur = [], ""
+    for w in text.split(" "):
+        t = (cur + " " + w).strip()
+        if cur and tracked(t, font, tracking).width > max_w:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = t
+    return lines + [cur]
+
+
+def stack(masks, gap):
+    w = max(m.width for m in masks)
+    h = sum(m.height for m in masks) + gap * (len(masks) - 1)
+    out = Image.new("L", (w, h), 0)
+    y = 0
+    for m in masks:
+        out.paste(m, ((w - m.width) // 2, y))
+        y += m.height + gap
+    return out
+
+
 class Overlay:
     def __init__(self, W, H):
         self.W, self.H = W, H
-        k = W / 1920.0
+        self.vertical = H > W
+        k = W / 1920.0 if not self.vertical else 1.0
         self.k = k
-        self.f_en = ImageFont.truetype(F_EN, int(round(44 * k)))
-        self.f_kr = ImageFont.truetype(F_KR, int(round(30 * k)))
+        self.f_en = ImageFont.truetype(F_EN, int(round(44 * k)) if not self.vertical else 40)
+        self.f_kr = ImageFont.truetype(F_KR, int(round(30 * k)) if not self.vertical else 36)
         self.blocks = []
         yy = np.arange(H, dtype=np.float32) / H
         self.shade = np.clip((yy - 0.62) / 0.30, 0, 1) ** 1.5
+        if self.vertical:                            # copy band above the Shorts / Reels caption area
+            self.shade = np.exp(-((yy - 0.66) / 0.10) ** 2) * 0.9
         for t0, t1, en, kr, layout in COPY:
-            m_en = np.asarray(tracked(en, self.f_en, 14 * k), np.float32) / 255.0
-            m_kr = np.asarray(tracked(kr, self.f_kr, 2 * k), np.float32) / 255.0
+            if self.vertical:
+                layout = "bottom"
+                m_en = np.asarray(tracked(en, self.f_en, 9), np.float32) / 255.0
+                m_kr = np.asarray(stack([tracked(l, self.f_kr, 1) for l in wrap(kr, self.f_kr, 1, int(W * 0.84))], 14),
+                                  np.float32) / 255.0
+            else:
+                m_en = np.asarray(tracked(en, self.f_en, 14 * k), np.float32) / 255.0
+                m_kr = np.asarray(tracked(kr, self.f_kr, 2 * k), np.float32) / 255.0
             gap = int(round(22 * k))
             bw = max(m_en.shape[1], m_kr.shape[1])
             bh = m_en.shape[0] + gap + m_kr.shape[0]
             if layout == "bottom":
-                cx, top = W // 2, int(H * 0.845) - bh // 2
+                cx, top = W // 2, int(H * (0.66 if self.vertical else 0.845)) - bh // 2
             else:                                    # right half, vertically centred
                 cx, top = int(W * 0.765), H // 2 - bh // 2
             items = [(m_en, cx - m_en.shape[1] // 2, top, 0.96),
@@ -104,7 +137,7 @@ class Overlay:
         # logo (content bbox of logo.png)
         lg = Image.open(LOGO).convert("RGBA")
         lg = lg.crop(lg.getchannel("A").getbbox())
-        lh = int(round(300 * k))
+        lh = int(round(300 * k)) if not self.vertical else 330
         lg = lg.resize((int(round(lg.width * lh / lg.height)), lh), Image.LANCZOS)
         a = np.asarray(lg, np.float32) / 255.0
         self.logo_rgb, self.logo_a = a[..., :3], a[..., 3:]

@@ -19,6 +19,7 @@ import compose as C
 FPS = C.FPS
 BAR, PHRASE = C.BAR, C.PHRASE
 SPLICE = C.M_A1 - C.M_A0          # film time of the splice onto the final hit (30 ms before it)
+W, H = 1920, 1080
 TAIL = 3.6                        # logo end card length
 F_KR_B = os.path.join(C.HERE, "fonts", "Pretendard-Regular.otf")
 F_EN_M = os.path.join(C.HERE, "fonts", "Montserrat_500Medium.ttf")
@@ -52,7 +53,7 @@ def make_clip(a, ov, dither, name, t0, t1):
           f"[b][l]acrossfade=d=0.012:c1=tri:c2=tri,"
           f"afade=t=in:d=0.25,afade=t=out:st={dur - 0.9:.3f}:d=0.9,atrim=end={dur:.3f}[aout]")
     cmd = ["ffmpeg", "-y", "-v", "error",
-           "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", "1920x1080", "-r", str(FPS), "-i", "-",
+           "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
            "-i", a.film, "-filter_complex", af, "-map", "0:v", "-map", "[aout]",
            "-c:v", "libx264", "-preset", "slow", "-crf", "16", "-pix_fmt", "yuv420p",
            "-movflags", "+faststart", "-c:a", "aac", "-b:a", "320k", "-t", f"{dur:.3f}", out]
@@ -61,7 +62,7 @@ def make_clip(a, ov, dither, name, t0, t1):
         if i < n_body:
             img = frame(a.frames, ov, f0 + i)
         else:
-            img = np.zeros((1080, 1920, 3), np.float32)
+            img = np.zeros((H, W, 3), np.float32)
             ov.logo(img, C.T_LOGO + (i - n_body) / FPS)
         t = i / FPS
         img *= C.ease(t / 0.15) * (1.0 - C.ease((t - (dur - 0.8)) / 0.8))
@@ -76,20 +77,29 @@ def make_thumb(a, name, n, head, sub):
     im = Image.open(C.frame_path(a.frames, n)).convert("RGB")
     img = np.asarray(im, np.float32) / 255.0
     # darken the lower band so the headline reads on any frame
-    yy = np.linspace(0, 1, 1080, dtype=np.float32)[:, None, None]
-    img = img * (1.0 - 0.75 * np.clip((yy - 0.55) / 0.35, 0, 1) ** 1.3)
+    V = H > W
+    yy = np.linspace(0, 1, H, dtype=np.float32)[:, None, None]
+    if V:   # Reels/Shorts cover: text inside the centre 3:4 the profile grid shows
+        img = img * (1.0 - 0.8 * np.exp(-((yy - 0.66) / 0.12) ** 2))
+    else:
+        img = img * (1.0 - 0.75 * np.clip((yy - 0.55) / 0.35, 0, 1) ** 1.3)
     im = Image.fromarray((np.clip(img, 0, 1) * 255 + 0.5).astype(np.uint8))
     d = ImageDraw.Draw(im)
-    f_kr = ImageFont.truetype(F_KR_B, 108)
-    f_en = ImageFont.truetype(F_EN_M, 38)
+    f_kr = ImageFont.truetype(F_KR_B, 88 if V else 108)
+    f_en = ImageFont.truetype(F_EN_M, 34 if V else 38)
     f_br = ImageFont.truetype(F_EN_M, 30)
-    w = d.textlength(head, font=f_kr)
-    d.text(((1920 - w) / 2, 840), head, font=f_kr, fill=(245, 245, 245))
+    lines = C.wrap(head, f_kr, 0, int(W * 0.88)) if V else [head]
+    y = int(H * 0.62) if V else 840
     sub_m = C.tracked(sub, f_en, 10)
-    im.paste((215, 215, 215), ((1920 - sub_m.width) // 2, 780), sub_m)
+    im.paste((215, 215, 215), ((W - sub_m.width) // 2, y - 60), sub_m)
+    for line in lines:
+        w = d.textlength(line, font=f_kr)
+        d.text(((W - w) / 2, y), line, font=f_kr, fill=(245, 245, 245))
+        y += 112
     br = C.tracked("GRAZR DP-301", f_br, 8)
-    im.paste((200, 200, 200), (60, 52), br)
-    im = im.resize((1280, 720), Image.LANCZOS)
+    im.paste((200, 200, 200), ((W - br.width) // 2, int(H * 0.16)) if V else (60, 52), br)
+    if not V:
+        im = im.resize((1280, 720), Image.LANCZOS)
     p = os.path.join(a.out, name + "_thumb.jpg")
     im.save(p, quality=92)
     print(p)
@@ -102,11 +112,15 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--only", default="", help="comma list of clip numbers, e.g. 1,3")
     ap.add_argument("--thumbs-only", action="store_true")
+    ap.add_argument("--vertical", action="store_true", help="9:16 clips from the vertical frames")
     a = ap.parse_args()
+    global W, H
+    if a.vertical:
+        W, H = 1080, 1920
     os.makedirs(a.out, exist_ok=True)
-    ov = C.Overlay(1920, 1080)
+    ov = C.Overlay(W, H)
     rng = np.random.default_rng(301)
-    dither = [(rng.random((1080, 1920, 1), np.float32) - 0.5) * (1.2 / 255) for _ in range(8)]
+    dither = [(rng.random((H, W, 1), np.float32) - 0.5) * (1.2 / 255) for _ in range(8)]
     only = {int(x) for x in a.only.split(",") if x}
     for i, (name, t0, t1, tn, head, sub) in enumerate(CLIPS, 1):
         if only and i not in only:

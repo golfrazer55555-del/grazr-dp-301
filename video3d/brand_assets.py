@@ -98,3 +98,56 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def kakao_and_instagram(frames, out):
+    """KakaoTalk channel profile/cover and Instagram profile + highlight covers."""
+    from PIL import ImageDraw
+    F_KR = os.path.join(C.HERE, "fonts", "Pretendard-Regular.otf")
+    mark, word = logo_parts()
+    # profile 640 (Kakao) / 1080 (Instagram): the GR mark, reads as a circle
+    for S, name in ((640, "kakao_profile_640.png"), (1080, "instagram_profile_1080.png")):
+        bg = np.full((S, S, 3), 0.035, np.float32) + radial(S, S, S / 2, S * 0.46, S * 0.55, S * 0.55, 0.10)[..., None]
+        im = to_img(bg).convert("RGBA")
+        m = fit(mark, int(S * 0.48))
+        im.alpha_composite(m, ((S - m.width) // 2, (S - m.height) // 2))
+        im.convert("RGB").save(os.path.join(out, name))
+    # Kakao channel cover: square 1600, content in the middle band so a wide crop keeps it
+    S = 1600
+    src = Image.open(C.frame_path(frames, 230)).convert("RGB")
+    src = src.resize((int(src.width * S / src.height), S), Image.LANCZOS)
+    x0 = (src.width - S) // 2
+    a = np.asarray(src.crop((x0, 0, x0 + S, S)), np.float32) / 255.0 * 0.45
+    yy, xx = np.mgrid[0:S, 0:S].astype(np.float32)
+    band = np.exp(-((yy - S / 2) / 330) ** 2) * np.exp(-((xx - S / 2) / 700) ** 2)
+    a = a * (1 - 0.85 * band)[..., None]
+    im = to_img(a).convert("RGBA")
+    m, w = fit(mark, 190), fit(word, 70)
+    f = ImageFont.truetype(F_EN, 26)
+    tag = C.tracked("PRECISION YOU CAN SEE", f, 11)
+    gap = 48
+    bw = m.width + gap + max(w.width, tag.width)
+    x = (S - bw) // 2
+    im.alpha_composite(m, (x, S // 2 - m.height // 2))
+    tx, th = x + m.width + gap, w.height + 30 + tag.height
+    ty = S // 2 - th // 2
+    im.alpha_composite(w, (tx, ty))
+    tc = Image.new("RGBA", tag.size, (200, 200, 200, 0))
+    tc.putalpha(tag.point(lambda v: int(v * 0.85)))
+    im.alpha_composite(tc, (tx + 4, ty + w.height + 30))
+    im.convert("RGB").save(os.path.join(out, "kakao_cover_1600.png"))
+    # Instagram highlight covers (1080x1920, content inside the centre circle)
+    f_kr = ImageFont.truetype(F_KR, 120)
+    for key, label in (("about", None), ("features", "기능"), ("review", "후기"), ("buy", "구매")):
+        W, H = 1080, 1920
+        bg = np.full((H, W, 3), 0.03, np.float32) + radial(W, H, W / 2, H / 2, 520, 520, 0.12)[..., None]
+        im = to_img(bg).convert("RGBA")
+        d = ImageDraw.Draw(im)
+        d.ellipse((W / 2 - 400, H / 2 - 400, W / 2 + 400, H / 2 + 400), outline=(120, 120, 124, 255), width=6)
+        if label is None:
+            m = fit(mark, 360)
+            im.alpha_composite(m, ((W - m.width) // 2, (H - m.height) // 2))
+        else:
+            tw = d.textlength(label, font=f_kr)
+            d.text(((W - tw) / 2, H / 2 - 82), label, font=f_kr, fill=(235, 235, 238, 255))
+        im.convert("RGB").save(os.path.join(out, f"instagram_highlight_{key}.png"))
