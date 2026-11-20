@@ -127,14 +127,19 @@ def jsonld():
     if C.SITE_URL:
         data["image"] = [C.SITE_URL + "/media/og.jpg", C.SITE_URL + "/media/product/full-black.webp"]
         data["url"] = C.SITE_URL + "/"
-    return json.dumps(data, ensure_ascii=False)
+    org = {"@context": "https://schema.org", "@type": "Organization", "name": "GRAZR", "alternateName": "그레이저",
+           "sameAs": [C.INSTAGRAM_URL, C.YOUTUBE_URL, C.KAKAO_URL]}
+    if C.SITE_URL:
+        org["url"] = C.SITE_URL + "/"
+        org["logo"] = C.SITE_URL + "/assets/img/logo-stacked.png"
+    return json.dumps([data, org], ensure_ascii=False)
 
 
 def main():
     env = Environment(loader=FileSystemLoader(os.path.join(HERE, "templates")), autoescape=select_autoescape(["html"]),
                       trim_blocks=True, lstrip_blocks=True)
     hero_frames = len([f for f in os.listdir(os.path.join(PUB, "media", "hero", "1600")) if f.endswith(".webp")])
-    common = dict(site_url=C.SITE_URL, store_url=C.STORE_URL, youtube_url=C.YOUTUBE_URL, kakao_url=C.KAKAO_URL, kakao_chat_url=C.KAKAO_CHAT_URL, biz=C.BUSINESS,
+    common = dict(site_url=C.SITE_URL, store_url=C.STORE_URL, youtube_url=C.YOUTUBE_URL, kakao_url=C.KAKAO_URL, instagram_url=C.INSTAGRAM_URL, kakao_chat_url=C.KAKAO_CHAT_URL, biz=C.BUSINESS,
                   options=C.OPTIONS, shipping=C.SHIPPING, notice=C.NOTICE, direct_pay=C.DIRECT_PAY,
                   hero_frames=hero_frames, year=datetime.date.today().year, fill=fill,
                   price=C.PRICE_KRW, pay_mode=C.PAY_MODE, toss_client_key=C.TOSS_CLIENT_KEY)

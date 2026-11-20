@@ -6,6 +6,7 @@ None = not provided yet: the page shows a visible "확인 필요" marker in its 
 SITE_URL = "https://grazr.co.kr"
 STORE_URL = "https://smartstore.naver.com/duddy/products/11585263659"
 YOUTUBE_URL = "https://www.youtube.com/@GRAZR-OFFICIAL"
+INSTAGRAM_URL = "https://www.instagram.com/grazr.official/"
 KAKAO_URL = "https://pf.kakao.com/_DFdvX"            # 카카오톡 채널 홈
 KAKAO_CHAT_URL = "https://pf.kakao.com/_DFdvX/chat"  # 1:1 채팅 바로 열기
 PRICE_KRW = 385000
@@ -179,6 +180,7 @@ KO = {
     "todo": "확인 필요",
     "youtube": "유튜브",
     "kakao": "카카오톡 채널",
+    "instagram": "인스타그램",
     "kakao_chat": "카카오톡 상담",
     "kakao_ask": "궁금한 점은 카카오톡으로 물어보세요",
 }
@@ -286,6 +288,7 @@ EN = {
     "todo": "TBD",
     "youtube": "YouTube",
     "kakao": "KakaoTalk",
+    "instagram": "Instagram",
     "kakao_chat": "Chat on KakaoTalk",
     "kakao_ask": "Questions? Chat with us on KakaoTalk",
 }

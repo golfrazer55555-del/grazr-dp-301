@@ -57,7 +57,7 @@
 ## 인스타그램
 
 **계정**
-- **사용자 이름:** `grazr.official` (또는 `grazr_golf`)
+- **사용자 이름:** `grazr.official` (https://www.instagram.com/grazr.official/)
 - **이름:** `GRAZR 그레이저 | 퍼터` (검색에 걸리는 칸이라 "퍼터"를 넣습니다)
 - **계정 유형:** 프로페셔널 → 비즈니스, 카테고리 "스포츠 용품"
 - **프로필 사진:** `instagram_profile_1080.png`
