@@ -1,6 +1,7 @@
 // Cloudflare Worker for grazr.co.kr. Connected to GitHub: Root directory = website,
 // no build command, deploy command `npx wrangler deploy`.
-// Static files come from ./public; only /api/* (payment approval) runs src/worker.js.
+// Static files come from ./public; only /api/* (payment approval, order admin) runs src/worker.js.
+// Secrets (dashboard, never in this file): TOSS_SECRET_KEY, ADMIN_PASSWORD (order admin login).
 {
   "name": "grazr",
   "main": "src/worker.js",
@@ -14,6 +15,9 @@
   },
   // Order notification mail (Cloudflare Email Routing, orders@grazr.co.kr -> verified Gmail)
   "send_email": [{ "name": "ORDER_MAIL", "destination_address": "grazrofficial@gmail.com" }],
+  // Orders saved at payment approval, read and updated by the /admin/ page (SQLite Durable Object)
+  "durable_objects": { "bindings": [{ "name": "ORDERS", "class_name": "OrderStore" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["OrderStore"] }],
   "vars": {
     "PRICE_KRW": "385000",
     "MAX_QTY": "3"

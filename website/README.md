@@ -50,6 +50,14 @@ python3 website/tools/make_media.py --only photos                       # 사진
 - `wrangler.jsonc`의 `send_email` 바인딩 `ORDER_MAIL` (받는 주소는 인증된 Gmail로 고정)
 - 테스트: Worker 설정에 암호화된 변수 `MAIL_TEST_KEY`를 넣고 `https://grazr.co.kr/api/mail-test?key=<그 값>`을 열면 테스트 메일이 갑니다. 끝나면 변수를 지우세요(지우면 이 주소는 404).
 
+## 주문 관리 (https://grazr.co.kr/admin/)
+사이트 결제가 승인되면 주문이 Cloudflare(Durable Object `OrderStore`, SQLite)에 저장됩니다. `/admin/`에서 휴대폰으로:
+- 발송 대기 / 발송 완료 / 취소 목록, 받는 분·휴대폰·주소 복사
+- 송장번호 입력 → 발송 처리 → "문자로 발송 안내"(문자 앱이 안내 문구와 함께 열림), 메일 안내, 배송 조회
+- 메모, 토스페이먼츠 결제 상태 확인, 결제 전액 취소(토스페이먼츠 취소 API)
+- 로그인 비밀번호: Worker의 암호화된 변수 `ADMIN_PASSWORD` (15분에 10번 틀리면 잠김, 로그인 30일 유지)
+- 주문 기록은 결제일부터 5년 보관 후 자동 삭제(전자상거래법). 스마트스토어 주문은 여기 없습니다.
+
 ## 사이트 결제 (다음 단계)
 도메인으로 사이트를 공개한 뒤 토스페이먼츠에 가입·심사 신청 → 승인 후 결제 화면과 결제 승인 처리(Worker)를 붙이고 `DIRECT_PAY = True`.
 토스페이먼츠 비밀 키는 코드에 넣지 않고 Cloudflare 설정의 암호화된 변수로 넣습니다.

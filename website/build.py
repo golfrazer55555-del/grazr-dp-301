@@ -208,7 +208,7 @@ def main():
         "background_color": "#000000", "theme_color": "#000000",
         "icons": [{"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
                   {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}]}, indent=1))
-    robots = "User-agent: *\nAllow: /\n"
+    robots = "User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /checkout/\n"
     if C.SITE_URL:
         robots += "Sitemap: %s/sitemap.xml\n" % C.SITE_URL
         urls = "".join("<url><loc>%s%s</loc></url>" % (C.SITE_URL, p) for p in ("/", "/en/", "/terms/", "/privacy/"))
@@ -225,6 +225,11 @@ def main():
         "  Cache-Control: public, max-age=604800",
         "/media/*",
         "  Cache-Control: public, max-age=604800",
+        "/admin/*",
+        "  X-Robots-Tag: noindex, nofollow",
+        "  Cache-Control: no-store",
+        "  X-Frame-Options: DENY",
+        "  Referrer-Policy: no-referrer",
         "",
     ]))
     print("done")
