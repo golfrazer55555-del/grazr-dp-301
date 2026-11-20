@@ -1,6 +1,7 @@
 // GRAZR site Worker: static files are served from ./public; only /api/* runs here.
 // POST /api/confirm approves a Toss Payments widget payment after checking the amount, then
 // (when the ORDER_MAIL send_email binding exists) emails the order and shipping details to GRAZR.
+// GET /api/mail-test?key=... sends a sample order mail; it only exists while the secret MAIL_TEST_KEY is set.
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
 
@@ -13,6 +14,28 @@ const kst = (iso) => {
   const d = iso ? new Date(iso) : new Date();
   return new Date(d.getTime() + 9 * 3600e3).toISOString().replace("T", " ").slice(0, 16) + " (KST)";
 };
+
+function sendMail(env, m) {
+  return import("cloudflare:email").then(({ EmailMessage }) => env.ORDER_MAIL.send(new EmailMessage(m.from, m.to, m.raw)));
+}
+
+async function mailTest(request, env, url) {
+  const key = env.MAIL_TEST_KEY;
+  if (!key || request.method !== "GET" || url.searchParams.get("key") !== key) return env.ASSETS.fetch(request);
+  if (!env.ORDER_MAIL) return json({ sent: false, message: "ORDER_MAIL 설정이 없습니다." }, 500);
+  const d = {
+    orderId: "TEST-" + Date.now(), orderName: "GRAZR DP-301 퍼터", totalAmount: Number(env.PRICE_KRW || 385000),
+    method: "카드", approvedAt: new Date().toISOString(), receipt: null,
+  };
+  const ship = { name: "홍길동", phone: "010-0000-0000", email: "test@example.com", address: "(00000) 테스트 주소",
+    memo: "메일 테스트", option: "34인치 · 블랙 샤프트", qty: "1" };
+  try {
+    await sendMail(env, orderMail(env, d, ship, true));
+    return json({ sent: true, message: "테스트 메일을 보냈습니다. Gmail을 확인하세요." });
+  } catch (e) {
+    return json({ sent: false, message: String((e && e.message) || e) }, 500);
+  }
+}
 
 function orderMail(env, d, ship, isTest) {
   const from = env.ORDER_MAIL_FROM || "orders@grazr.co.kr";
@@ -39,7 +62,7 @@ function orderMail(env, d, ship, isTest) {
     "영수증: " + ((d.receipt && d.receipt.url) || "-"),
     "결제 관리(취소·환불): https://app.tosspayments.com",
     "",
-    "결제 후 3일 이내 발송 · 한진택배",
+    "결제 후 1일 이내 발송 · 로젠택배",
   ].filter((l, i) => i > 0 || l);
   const subject = (isTest ? "[테스트] " : "") + "[GRAZR 주문] " + (ship.name || "") + " · " + d.orderName + " · " + won(d.totalAmount);
   const raw = [
@@ -60,6 +83,7 @@ function orderMail(env, d, ship, isTest) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname === "/api/mail-test") return mailTest(request, env, url);
     if (url.pathname !== "/api/confirm") return env.ASSETS.fetch(request);
     if (request.method !== "POST") return json({ code: "METHOD_NOT_ALLOWED", message: "허용되지 않은 요청입니다." }, 405);
 
@@ -97,8 +121,7 @@ export default {
         option: clip(meta.option || s.option, 40), qty: String(Math.round(d.totalAmount / price)),
       };
       const m = orderMail(env, d, ship, isTest);
-      const send = import("cloudflare:email")
-        .then(({ EmailMessage }) => env.ORDER_MAIL.send(new EmailMessage(m.from, m.to, m.raw)))
+      const send = sendMail(env, m)
         .catch((e) => console.error("order mail failed", d.orderId, e && e.message));
       if (ctx && ctx.waitUntil) ctx.waitUntil(send); else await send;
     }

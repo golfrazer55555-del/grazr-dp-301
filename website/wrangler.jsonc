@@ -12,6 +12,8 @@
     "not_found_handling": "404-page",
     "run_worker_first": ["/api/*"]
   },
+  // Order notification mail (Cloudflare Email Routing, orders@grazr.co.kr -> verified Gmail)
+  "send_email": [{ "name": "ORDER_MAIL", "destination_address": "grazrofficial@gmail.com" }],
   "vars": {
     "PRICE_KRW": "385000",
     "MAX_QTY": "3"

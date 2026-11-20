@@ -44,6 +44,12 @@ python3 website/tools/make_media.py --only photos                       # 사진
 - Cloudflare에서 산 도메인: Worker → **Settings → Domains & Routes → Add → Custom domain**에 도메인 입력
 - 가비아에서 산 도메인: Cloudflare **Add a domain**으로 도메인 추가 → 안내되는 네임서버 2개를 가비아 **도메인 관리 → 네임서버 설정**에 입력 → 연결되면 위와 같이 Custom domain 추가
 
+## 주문 알림 메일
+사이트에서 결제가 승인되면 `orders@grazr.co.kr`이 주문 내용(상품, 옵션, 금액, 받는 분, 연락처, 주소, 메모)을 `grazrofficial@gmail.com`으로 보냅니다.
+- Cloudflare **Email Routing**(grazr.co.kr): 켜짐. 라우팅 규칙 `orders@grazr.co.kr → grazrofficial@gmail.com`, 받는 주소 Verified
+- `wrangler.jsonc`의 `send_email` 바인딩 `ORDER_MAIL` (받는 주소는 인증된 Gmail로 고정)
+- 테스트: Worker 설정에 암호화된 변수 `MAIL_TEST_KEY`를 넣고 `https://grazr.co.kr/api/mail-test?key=<그 값>`을 열면 테스트 메일이 갑니다. 끝나면 변수를 지우세요(지우면 이 주소는 404).
+
 ## 사이트 결제 (다음 단계)
 도메인으로 사이트를 공개한 뒤 토스페이먼츠에 가입·심사 신청 → 승인 후 결제 화면과 결제 승인 처리(Worker)를 붙이고 `DIRECT_PAY = True`.
 토스페이먼츠 비밀 키는 코드에 넣지 않고 Cloudflare 설정의 암호화된 변수로 넣습니다.
