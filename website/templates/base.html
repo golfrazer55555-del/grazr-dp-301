@@ -61,6 +61,7 @@
         <a href="{{ t.footer_terms[1] }}">{{ t.footer_terms[0] }}</a>
         <a href="{{ t.footer_privacy[1] }}"><strong>{{ t.footer_privacy[0] }}</strong></a>
         <a href="{{ youtube_url }}" target="_blank" rel="noopener">{{ t.youtube }}</a>
+        <a href="{{ kakao_url }}" target="_blank" rel="noopener">{{ t.kakao }}</a>
       </div>
     </div>
     <dl class="biz">
@@ -71,6 +72,7 @@
     <p class="copy">© {{ year }} GRAZR. All rights reserved.</p>
   </div>
 </footer>
+{% block kakao_fab %}<a class="kakao-fab" href="{{ kakao_chat_url }}" target="_blank" rel="noopener" aria-label="{{ t.kakao_chat }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c-5.25 0-9.5 3.33-9.5 7.44 0 2.66 1.78 4.99 4.46 6.3l-.9 3.3c-.08.29.25.52.5.35l3.95-2.62c.49.07.99.1 1.49.1 5.25 0 9.5-3.33 9.5-7.43S17.25 3.5 12 3.5z"/></svg><span>{{ t.kakao_chat }}</span></a>{% endblock %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

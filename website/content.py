@@ -6,6 +6,8 @@ None = not provided yet: the page shows a visible "확인 필요" marker in its 
 SITE_URL = "https://grazr.co.kr"
 STORE_URL = "https://smartstore.naver.com/duddy/products/11585263659"
 YOUTUBE_URL = "https://www.youtube.com/@GRAZR-OFFICIAL"
+KAKAO_URL = "https://pf.kakao.com/_DFdvX"            # 카카오톡 채널 홈
+KAKAO_CHAT_URL = "https://pf.kakao.com/_DFdvX/chat"  # 1:1 채팅 바로 열기
 PRICE_KRW = 385000
 DIRECT_PAY = False         # show the "사이트에서 바로 결제" button on the home page (after Toss approval)
 # Toss Payments (결제위젯). "test" = no real charge; switch to "live" with the live client key after approval
@@ -176,6 +178,9 @@ KO = {
                    "address": "주소", "phone": "전화", "email": "이메일", "hosting": "호스팅 제공자"},
     "todo": "확인 필요",
     "youtube": "유튜브",
+    "kakao": "카카오톡 채널",
+    "kakao_chat": "카카오톡 상담",
+    "kakao_ask": "궁금한 점은 카카오톡으로 물어보세요",
 }
 
 EN = {
@@ -280,4 +285,7 @@ EN = {
                    "address": "Address", "phone": "Tel", "email": "Email", "hosting": "Hosting"},
     "todo": "TBD",
     "youtube": "YouTube",
+    "kakao": "KakaoTalk",
+    "kakao_chat": "Chat on KakaoTalk",
+    "kakao_ask": "Questions? Chat with us on KakaoTalk",
 }

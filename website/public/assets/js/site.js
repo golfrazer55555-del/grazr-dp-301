@@ -254,3 +254,13 @@
 
   initHero(); initClips(); initSound(); initOptions(); initViewer(); initPhotos(); initReveal();
 })();
+
+/* KakaoTalk chat button: keep it off the opening film, show it once the visitor scrolls past it */
+(function () {
+  var fab = document.querySelector(".kakao-fab");
+  if (!fab || !document.querySelector(".hero-sticky")) return;
+  var tick = function () { fab.classList.toggle("is-hidden", window.scrollY < window.innerHeight * 0.9); };
+  tick();
+  window.addEventListener("scroll", tick, { passive: true });
+  window.addEventListener("resize", tick);
+})();

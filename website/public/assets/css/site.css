@@ -311,3 +311,23 @@ section { position: relative; }
   .co-grid { grid-template-columns: 1fr; }
   .co-summary { position: static; }
 }
+
+/* KakaoTalk channel: Kakao yellow + black symbol, as Kakao's button guide asks */
+.btn-kakao { background: #fee500; color: rgba(0, 0, 0, .85); margin-top: 14px; }
+.btn-kakao:hover { background: #ffeb3b; }
+.kakao-fab {
+  position: fixed; z-index: 40; right: calc(16px + env(safe-area-inset-right)); bottom: calc(16px + env(safe-area-inset-bottom));
+  display: inline-flex; align-items: center; gap: 8px; height: 52px; padding: 0 20px 0 16px; border-radius: 26px;
+  background: #fee500; color: rgba(0, 0, 0, .85); font-size: 15px; font-weight: 600; text-decoration: none;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .45);
+  transition: transform .2s var(--ease), box-shadow .2s var(--ease), opacity .3s var(--ease), visibility .3s;
+}
+.kakao-fab.is-hidden { opacity: 0; visibility: hidden; transform: translateY(12px); }
+.kakao-fab svg { width: 24px; height: 24px; fill: currentColor; flex: none; }
+.kakao-fab:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0, 0, 0, .55); }
+.kakao-fab:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+@media (max-width: 640px) {
+  .kakao-fab { width: 52px; padding: 0; justify-content: center; }
+  .kakao-fab span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+@media print { .kakao-fab { display: none; } }
