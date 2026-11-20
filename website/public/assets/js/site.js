@@ -264,3 +264,15 @@
   window.addEventListener("scroll", tick, { passive: true });
   window.addEventListener("resize", tick);
 })();
+
+/* "사이트에서 바로 결제" carries the chosen shaft into the checkout page */
+(function () {
+  var link = document.querySelector("[data-checkout-link]");
+  if (!link) return;
+  var sync = function () {
+    var r = document.querySelector("[data-shaft-input]:checked");
+    if (r) link.href = "/checkout/?shaft=" + encodeURIComponent(r.value);
+  };
+  [].forEach.call(document.querySelectorAll("[data-shaft-input]"), function (r) { r.addEventListener("change", sync); });
+  sync();
+})();

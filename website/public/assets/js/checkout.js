@@ -30,6 +30,10 @@
         });
       });
     });
+    var want = new URLSearchParams(location.search).get("shaft");
+    [].forEach.call(form.querySelectorAll("[data-shaft-input]"), function (r) {
+      if (want && r.value === want && !r.checked) { r.checked = true; r.dispatchEvent(new Event("change")); }
+    });
     form.qty.addEventListener("change", function () {
       refresh();
       if (widgets) widgets.setAmount({ currency: "KRW", value: amount() });

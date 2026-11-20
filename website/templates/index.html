@@ -157,13 +157,18 @@
         <p class="small muted">{{ t.buy_same_price }}</p>
       </fieldset>
       <p class="small">{{ t.buy_includes }}</p>
+      {% if direct_pay %}
+      <a class="btn btn-primary btn-block" href="/checkout/?shaft={{ options[0].key }}" data-checkout-link>{{ t.buy_direct }}</a>
+      <p class="small muted">{{ t.buy_direct_note }}</p>
+      <a class="btn btn-ghost btn-block" href="{{ store_url }}" target="_blank" rel="noopener">
+        <span>{{ t.buy_store }}</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7h-2V6.4l-9.3 9.3-1.4-1.4L17.6 5H14V3zM5 5h6v2H7v10h10v-4h2v6H5V5z"/></svg>
+      </a>
+      {% else %}
       <a class="btn btn-primary btn-block" href="{{ store_url }}" target="_blank" rel="noopener">
         <span>{{ t.buy_store }}</span>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7h-2V6.4l-9.3 9.3-1.4-1.4L17.6 5H14V3zM5 5h6v2H7v10h10v-4h2v6H5V5z"/></svg>
       </a>
-      {% if direct_pay %}
-      <a class="btn btn-ghost btn-block" href="/checkout/">{{ t.buy_direct }}</a>
-      {% else %}
       <p class="small muted">{{ t.buy_direct_soon }}</p>
       {% endif %}
       <p class="small muted">{{ t.buy_note }}</p>

@@ -10,7 +10,7 @@ INSTAGRAM_URL = "https://www.instagram.com/grazr.official/"
 KAKAO_URL = "https://pf.kakao.com/_DFdvX"            # 카카오톡 채널 홈
 KAKAO_CHAT_URL = "https://pf.kakao.com/_DFdvX/chat"  # 1:1 채팅 바로 열기
 PRICE_KRW = 385000
-DIRECT_PAY = False         # show the "사이트에서 바로 결제" button on the home page (after Toss approval)
+DIRECT_PAY = True          # show the "사이트에서 바로 결제" button on the home page (after Toss approval)
 # Toss Payments (결제위젯). "test" = no real charge; switch to "live" with the live client key after approval
 # and set the live secret key as the Cloudflare secret TOSS_SECRET_KEY (never in this file).
 PAY_MODE = "live"
@@ -149,9 +149,10 @@ KO = {
     "buy_same_price": "두 길이 모두 같은 가격입니다.",
     "buy_includes": "구성: 퍼터 + 전용 헤드커버 · 오른손용",
     "buy_store": "네이버 스마트스토어에서 구매",
+    "buy_direct_note": "신용·체크카드, 간편결제 · 토스페이먼츠 안전결제",
     "buy_direct": "사이트에서 바로 결제",
     "buy_direct_soon": "사이트 결제는 준비 중입니다.",
-    "buy_note": "현재 결제·배송·교환은 네이버 스마트스토어에서 진행됩니다.",
+    "buy_note": "사이트와 스마트스토어 모두 가격·배송·교환 조건이 같습니다.",
     "faq_eyebrow": "FAQ",
     "faq_title": "자주 묻는 질문",
     "faq": [
