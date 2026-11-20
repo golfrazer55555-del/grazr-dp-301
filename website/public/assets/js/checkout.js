@@ -119,7 +119,7 @@
     }
     function show(r) {
       title.textContent = "주문이 완료됐습니다";
-      msg.textContent = "결제 후 3일 이내에 한진택배로 발송합니다. 결제 영수증은 아래에서 확인하실 수 있습니다.";
+      msg.textContent = "결제 후 1일 이내에 로젠택배로 발송합니다. 결제 영수증은 아래에서 확인하실 수 있습니다.";
       var o = load("grazr-order-" + orderId) || {};
       detail.hidden = false;
       row("주문번호", r.orderId);
