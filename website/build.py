@@ -122,7 +122,30 @@ def jsonld():
         "@context": "https://schema.org", "@type": "Product", "name": "GRAZR DP-301 퍼터",
         "brand": {"@type": "Brand", "name": "GRAZR"}, "model": "DP-301", "description": C.KO["description"],
         "offers": {"@type": "Offer", "priceCurrency": "KRW", "price": str(C.PRICE_KRW),
-                   "availability": "https://schema.org/InStock", "url": C.STORE_URL},
+                   "availability": "https://schema.org/InStock", "itemCondition": "https://schema.org/NewCondition",
+                   "url": C.STORE_URL,
+                   # same terms as content.SHIPPING: free shipping in Korea, dispatched within 1 day
+                   "shippingDetails": {
+                       "@type": "OfferShippingDetails",
+                       "shippingRate": {"@type": "MonetaryAmount", "value": 0, "currency": "KRW"},
+                       "shippingDestination": {"@type": "DefinedRegion", "addressCountry": "KR"},
+                       "deliveryTime": {
+                           "@type": "ShippingDeliveryTime",
+                           "handlingTime": {"@type": "QuantitativeValue", "minValue": 0, "maxValue": 1, "unitCode": "DAY"},
+                           "transitTime": {"@type": "QuantitativeValue", "minValue": 1, "maxValue": 3, "unitCode": "DAY"},
+                       },
+                   },
+                   # 7-day returns by mail; change of mind: buyer pays 16,000 KRW round trip (free outbound), defects: free
+                   "hasMerchantReturnPolicy": {
+                       "@type": "MerchantReturnPolicy",
+                       "applicableCountry": "KR",
+                       "returnPolicyCategory": "https://schema.org/MerchantReturnFiniteReturnWindow",
+                       "merchantReturnDays": 7,
+                       "returnMethod": "https://schema.org/ReturnByMail",
+                       "customerRemorseReturnFees": "https://schema.org/ReturnShippingFees",
+                       "customerRemorseReturnShippingFeesAmount": {"@type": "MonetaryAmount", "value": 16000, "currency": "KRW"},
+                       "itemDefectReturnFees": "https://schema.org/FreeReturn",
+                   }},
     }
     if C.SITE_URL:
         data["image"] = [C.SITE_URL + "/media/og.jpg", C.SITE_URL + "/media/product/full-black.webp"]
