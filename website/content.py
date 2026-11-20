@@ -264,7 +264,7 @@ EN = {
         ("Grip", "GRAZR standard grip"),
         ("In the box", "Putter, head cover"),
         ("Hand", "Right-handed"),
-        ("Made in", "Korea (INGOLF)"),
+        ("Made in", "Korea"),
     ],
     "avail_eyebrow": "AVAILABILITY",
     "avail_title": "Sold in Korea",
