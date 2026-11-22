@@ -22,7 +22,8 @@ import bpy  # noqa: E402
 import bmesh
 import numpy as np
 from mathutils import Matrix, Vector
-from scipy.interpolate import PchipInterpolator
+from scipy.interpolate import CubicSpline, PchipInterpolator
+from scipy.optimize import brentq
 from scipy.spatial import cKDTree
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -49,56 +50,107 @@ def _se_xy(th):
     return 53.0 * np.cos(th) ** (2 / SE_N), SE_Y0 + (HEAD_D - SE_Y0) * np.sin(th) ** (2 / SE_M)
 
 
-def _tip_arc(R=7.0):
-    """Round the superellipse's point with a circle of radius R tangent to it (the drawing's nose is rounded)."""
-    th = np.linspace(0.05, np.pi / 2 - 1e-4, 20000)
-    x, y = _se_xy(th)
-    dx, dy = np.gradient(x, th), np.gradient(y, th)
-    nx, ny = -dy, dx                                         # inward normal (towards the centre line)
-    nn = np.hypot(nx, ny)
-    nx, ny = nx / nn, ny / nn
-    t = -x / nx                                              # normal line meets the centre line X = 0
-    yc = y + t * ny
-    i = int(np.argmin(np.abs(t - R)))
-    return float(th[i]), float(y[i]), float(yc[i]), float(t[i])
+# Nose: behind Y 84 the superellipse (whose own end is a point) hands over, matching value, slope and curvature, to
+# w^2 = 2 rho e + a e^2 + b e^3 + c e^4 (e = 95 - Y), fitted to the top drawing's nose (max 0.21 mm): a round tip
+# of radius rho = 14.6 mm, as drawn.
+NOSE_B = 84.0
+NOSE_P = (14.55217, 1.91438, -0.06561, 0.00076)
+TIP_Y = HEAD_D                                               # back end of the head
 
 
-TH_T, Y_T, Y_C, TIP_R = _tip_arc()
-TIP_Y = Y_C + TIP_R                                          # back end of the head (about 95)
+def _nose_w(y):
+    e = np.clip(HEAD_D - np.asarray(y, float), 0, None)
+    return np.sqrt(np.clip(2 * NOSE_P[0] * e + NOSE_P[1] * e ** 2 + NOSE_P[2] * e ** 3 + NOSE_P[3] * e ** 4, 0, None))
 
 
-def half_width(y):
+def _hw_core(y):
+    """Half width of the top-view outline without the face plate's corner round (the distance field uses this)."""
     y = np.asarray(y, float)
     t = np.clip((y - SE_Y0) / (HEAD_D - SE_Y0), 0, 1)
     w = 53.0 * np.clip(1 - t ** SE_M, 0, 1) ** (1 / SE_N)
-    arc = np.sqrt(np.clip(TIP_R ** 2 - (y - Y_C) ** 2, 0, None))
-    w = np.where(y > Y_T, arc, w)
+    return np.where(y > NOSE_B, _nose_w(y), w)
+
+
+def half_width(y):
+    """Half width of the top-view outline, with the small vertical round on the face plate's corners."""
+    y = np.asarray(y, float)
     corner = 53.0 - CORNER_R + np.sqrt(np.clip(CORNER_R ** 2 - (CORNER_R - y) ** 2, 0, None))
-    return np.where(y < CORNER_R, corner, w)
+    return np.where(y < CORNER_R, corner, _hw_core(y))
+
+
+def corner_squash(y):
+    """The face plate corner round squeezes the section sideways (like the front round squeezes it vertically):
+    a point at x is shaped like the point x * k on the full-width section. Returns k and dk/dy."""
+    y = np.asarray(y, float)
+    ratio = lambda v: 53.0 / half_width(np.minimum(v, CORNER_R))          # the core width is 53 at the face
+    h = 1e-5
+    yl, yh = np.maximum(y - h, 0.0), y + h
+    near = y < CORNER_R
+    return np.where(near, ratio(y), 1.0), np.where(near, (ratio(yh) - ratio(yl)) / (yh - yl), 0.0)
+
+
+# Side silhouettes, measured column by column on the heel-side drawing (red arrow masked out; the drawing's stroke
+# edges at 0.16 / 55.93 mm mapped to the sole 0 and the KSPO height 56):
+#   top    cubic spline through the smoothed drawing line (rms 0.024 mm), flat 56 to Y 48
+#   bottom flat sole, soft bend at Y 42.7, then a slightly curving 21-25 deg rise (rms 0.04 mm behind Y 48)
+#   back   straight 77.5 deg face (rms 0.05 mm)
+#   corners rounded with r 2.8 (nose tip) and r 3.5 (rise -> back face), fitted to the drawing (rms 0.05 mm)
+TOP_KNOTS = [(44.0, 56.0), (46.0, 56.0), (48.0, 56.0), (50.0, 55.995), (52.0, 55.884), (54.0, 55.669),
+             (56.0, 55.425), (58.0, 55.168), (60.0, 54.898), (62.0, 54.615), (64.0, 54.32), (66.0, 54.006),
+             (68.0, 53.674), (70.0, 53.355), (72.0, 53.01), (74.0, 52.636), (76.0, 52.25), (78.0, 51.846),
+             (80.0, 51.421), (82.0, 50.968), (84.0, 50.478), (86.0, 49.947), (88.0, 49.36), (90.0, 48.69),
+             (92.0, 47.846), (94.0, 46.663), (94.4, 46.397)]
+_tk = np.array(TOP_KNOTS)
+_tcs = CubicSpline(_tk[:, 0], _tk[:, 1], bc_type=((1, 0.0), "not-a-knot"))
+BACK_A, BACK_B = 85.1682, 0.22037            # back face: Y = A + B Z
+TIP_RT, TIP_RB = 2.8, 3.5                    # nose tip round / round where the sole rise meets the back face
 
 
 def _top_line(y):
-    """Side drawing top silhouette: flat to Y 46, then 56 - 0.0082 (Y-46)^1.8 (rms 0.21 mm to the drawing);
-    the last 1.5 mm rounds down into the nose tip at 43.6."""
     y = np.asarray(y, float)
-    z = 56.0 - 0.00819673 * np.clip(y - 46.0, 0, None) ** 1.79798
-    z95 = 56.0 - 0.00819673 * (95.0 - 46.0) ** 1.79798
-    return z - (z95 - 43.6) * np.clip((y - 93.5) / 1.5, 0, 1) ** 2.2
+    return np.where(y < 44.0, 56.0, _tcs(np.clip(y, 44.0, None)))
 
 
-def _bot_line(y):
-    """Side drawing bottom silhouette: flat, then a straight 22 deg rise (z = 0.4037 Y - 17.41, residual < 0.15 mm)
-    with a soft start, then the nose end rising into the tip (measured points)."""
+def _bot_line(y, k=0.6):
     y = np.asarray(y, float)
-    k = 0.6
-    return k * np.log1p(np.exp((0.40372 * y - 17.4084) / k))
+    return k * np.logaddexp(0.0, (0.39580 * (y - 60.0) + 6.3724 + 0.001150 * (y - 60.0) ** 2) / k)
 
 
-_ys = np.arange(0.0, 93.51, 0.5)
-_st = PchipInterpolator(_ys.tolist() + [94.0, 94.5, 95.0], _top_line(np.concatenate([_ys, [94.0, 94.5, 95.0]])))
-_yb = np.arange(0.0, 87.51, 0.5)
-_sb = PchipInterpolator(_yb.tolist() + [89.9, 92.0, 94.0, 95.0],
-                        np.concatenate([_bot_line(_yb), [21.4, 30.4, 39.8, 43.6]]))
+def _fillet(f, r, y_lo, y_hi, below):
+    """Circle of radius r tangent to the curve z = f(y) (centre below it if `below`) and in front of the back face.
+    Returns the centre and the two tangent points (on the curve, on the back face)."""
+    def centre(ya):
+        sl = (f(ya + 1e-5) - f(ya - 1e-5)) / 2e-5
+        n = np.array([-sl, 1.0]) / np.hypot(sl, 1.0)
+        return np.array([ya, float(f(ya))]) + (-r if below else r) * n
+
+    def gap(ya):
+        c = centre(ya)
+        return (c[0] - (BACK_A + BACK_B * c[1])) / np.hypot(1.0, BACK_B) + r
+    ya = brentq(gap, y_lo, y_hi)
+    c = centre(ya)
+    nb = np.array([1.0, -BACK_B]) / np.hypot(1.0, BACK_B)
+    return c, np.array([ya, float(f(ya))]), c - (gap(ya) - r) * nb
+
+
+_CT, _PT_TOP, _PT_BACK = _fillet(_top_line, TIP_RT, 85.0, 96.0, True)
+_CB, _PB_BOT, _PB_BACK = _fillet(_bot_line, TIP_RB, 80.0, 92.0, False)
+SIDE_TIP_Y = float(_CT[0] + TIP_RT)          # 94.92 on the drawing; scaled onto the outline's tip below
+TIP_Z = float(_CT[1])                        # 44.5: height of the nose tip
+
+
+def _side_top(Y):
+    arc = _CT[1] + np.sqrt(np.clip(TIP_RT ** 2 - (Y - _CT[0]) ** 2, 0, None))
+    return np.where(Y < _PT_TOP[0], _top_line(Y), arc)
+
+
+def _side_bot(Y):
+    z = _bot_line(Y)
+    z = np.where(Y > _PB_BOT[0], _CB[1] - np.sqrt(np.clip(TIP_RB ** 2 - (Y - _CB[0]) ** 2, 0, None)), z)
+    z = np.where(Y > _PB_BACK[0], (Y - BACK_A) / BACK_B, z)
+    return np.where(Y > _PT_BACK[0], _CT[1] - np.sqrt(np.clip(TIP_RT ** 2 - (Y - _CT[0]) ** 2, 0, None)), z)
+
+
 # front cross-section half profile (x, z): top round, outward-leaning wall, lower curve, flat sole
 TOP_PROFILE = [(0, 56.0), (25.0, 56.0), (27.0, 55.92), (31.0, 55.4), (35.0, 54.5), (38.5, 53.3), (41.5, 51.9),
                (44.2, 50.2), (46.6, 48.4), (48.8, 46.5), (50.6, 44.6), (51.9, 42.8), (52.7, 41.3), (53.0, 40.0)]
@@ -135,8 +187,9 @@ def _front_round(y):
     return np.where(y < FRONT_R, FRONT_R - np.sqrt(np.clip(FRONT_R ** 2 - (FRONT_R - y) ** 2, 0, None)), 0.0)
 
 
-s_top = lambda y: _st(np.clip(np.asarray(y, float) * 95.0 / TIP_Y, 0, 95.0)) - _front_round(y)
-s_bot = lambda y: _sb(np.clip(np.asarray(y, float) * 95.0 / TIP_Y, 0, 95.0)) + _front_round(y)
+_KS = SIDE_TIP_Y / TIP_Y
+s_top = lambda y: _side_top(np.clip(np.asarray(y, float) * _KS, 0, SIDE_TIP_Y)) - _front_round(y)
+s_bot = lambda y: _side_bot(np.clip(np.asarray(y, float) * _KS, 0, SIDE_TIP_Y)) + _front_round(y)
 _top = pchip(TOP_PROFILE)
 _bot = pchip(BOT_PROFILE)
 # The profile points are joined by PCHIP, which is only C1: its curvature jumps at every point and that shows
@@ -152,13 +205,13 @@ U = lambda d: np.interp(np.sqrt(np.clip(d, 0, 53.0)), _RR, _U_tab)   # height of
 L = lambda d: np.interp(np.sqrt(np.clip(d, 0, 53.0)), _RR, _L_tab)   # depth of the bottom below the edge line
 
 # outline (toe side -> tip -> heel side, the face edge left out), sampled densely
-_th = np.linspace(0, TH_T, 6000)
+_th = np.linspace(0, np.arcsin(((NOSE_B - SE_Y0) / (HEAD_D - SE_Y0)) ** (SE_M / 2)), 6000)
 _w, _y = _se_xy(_th)
-_ph = np.linspace(np.arctan2(Y_T - Y_C, float(half_width(Y_T))), np.pi / 2, 1500)
-_w = np.concatenate([_w, TIP_R * np.cos(_ph)])
-_y = np.concatenate([_y, Y_C + TIP_R * np.sin(_ph)])
+_u = np.linspace(np.sqrt(HEAD_D - NOSE_B), 0, 3000)[1:] ** 2      # nose: denser towards the tip
+_w = np.concatenate([_w, _nose_w(HEAD_D - _u)])
+_y = np.concatenate([_y, HEAD_D - _u])
 _yc = np.linspace(0, SE_Y0, 2000)
-heel = np.concatenate([np.stack([half_width(_yc), _yc], 1), np.stack([_w, _y], 1)])
+heel = np.concatenate([np.stack([_hw_core(_yc), _yc], 1), np.stack([_w, _y], 1)])
 outline = np.concatenate([heel * [-1, 1], heel[::-1][1:]])
 TREE = cKDTree(outline)
 
@@ -170,9 +223,42 @@ GY = np.arange(-6.0, 100.0001, 0.1)
 _XX, _YY = np.meshgrid(GX, GY, indexing="ij")
 _ay = np.abs(_YY)
 _d = TREE.query(np.stack([_XX.ravel(), _ay.ravel()], 1))[0].reshape(_XX.shape)
-_inside = (np.abs(_XX) <= half_width(np.minimum(_ay, TIP_Y))) & (_ay <= TIP_Y)
+_inside = (np.abs(_XX) <= _hw_core(np.minimum(_ay, TIP_Y))) & (_ay <= TIP_Y)
 from scipy.ndimage import gaussian_filter, map_coordinates, spline_filter  # noqa: E402
 SDF = spline_filter(gaussian_filter(np.where(_inside, _d, -_d), sigma=25.0), order=3)   # cubic: smooth normals
+
+
+_OL = outline[np.r_[True, np.hypot(*np.diff(outline, axis=0).T) > 1e-9]]   # drop repeated points (zero segments)
+_SA = _OL[:-1]
+_SD = _OL[1:] - _SA
+_SL2 = (_SD ** 2).sum(1)
+_SN = np.stack([_SD[:, 1], -_SD[:, 0]], 1) / np.sqrt(_SL2)[:, None]      # inward unit normal of each segment
+_OL_TREE = cKDTree(_OL)
+
+
+def poly_dist(x, y):
+    """Distance to the outline polyline itself (not to its samples), so it is smooth in x and y, and its gradient
+    (unit vector pointing inside, away from the nearest outline point)."""
+    p = np.stack([x, np.abs(y)], 1)
+    _, idx = _OL_TREE.query(p, k=2)
+    best = np.full(len(p), np.inf)
+    grad = np.zeros((len(p), 2))
+    for k in range(2):
+        for off in (-1, 0):
+            i = np.clip(idx[:, k] + off, 0, len(_SA) - 1)
+            t = np.clip(((p - _SA[i]) * _SD[i]).sum(1) / _SL2[i], 0, 1)
+            v = p - (_SA[i] + t[:, None] * _SD[i])
+            dd = np.hypot(v[:, 0], v[:, 1])
+            # points on the outline or a hair outside it (the true curve bulges past the polyline's chords): the
+            # outline's own inward normal, never the reversed direction from the nearest point
+            on = (v * _SN[i]).sum(1) < 1e-6
+            g = np.where(on[:, None], _SN[i], v / np.maximum(dd, 1e-12)[:, None])
+            dd = np.where(on, 0.0, dd)
+            better = dd < best
+            best = np.where(better, dd, best)
+            grad = np.where(better[:, None], g, grad)
+    grad[:, 1] *= np.where(np.asarray(y) < 0, -1.0, 1.0)
+    return best, grad
 
 
 def dist(x, y):
@@ -180,11 +266,114 @@ def dist(x, y):
     takes over deeper inside (from 3 to 8 mm), where it smooths the centre-line crease."""
     x = np.ravel(np.asarray(x, float))
     y = np.ravel(np.asarray(y, float))
-    dt = TREE.query(np.stack([x, np.abs(y)], 1))[0]
+    dt = poly_dist(x, y)[0]
     db = map_coordinates(SDF, [(x - GX[0]) / 0.1, (y - GY[0]) / 0.1], order=3, mode="nearest", prefilter=False)
     w = np.clip((dt - 3.0) / 5.0, 0, 1)
     w = w * w * (3 - 2 * w)
     return dt * (1 - w) + np.minimum(db, dt) * w
+
+
+def dist_grad(x, y):
+    """Gradient of dist(): exact near the outline (where dist is the plain distance), central differences inside."""
+    x = np.ravel(np.asarray(x, float))
+    y = np.ravel(np.asarray(y, float))
+    dt, g = poly_dist(x, y)
+    deep = dt > 2.9
+    if deep.any():
+        h = 0.01
+        xd, yd = x[deep], y[deep]
+        g[deep, 0] = (dist(xd + h, yd) - dist(xd - h, yd)) / (2 * h)
+        g[deep, 1] = (dist(xd, yd + h) - dist(xd, yd - h)) / (2 * h)
+    return g
+
+
+def _row_raw(y):
+    y = np.ravel(np.asarray(y, float))
+    dm = dist(np.zeros_like(y), y)
+    st, sb = s_top(y), s_bot(y)
+    um, lm = U(dm), L(dm)
+    return st - um * (st - sb) / np.maximum(um + lm, 1e-9), st, sb, um, lm
+
+
+def _hermite5(y, y0, y1, p0, d0, a0, p1, d1, a1):
+    """Quintic Hermite: value, slope and curvature given at both ends (so the join is C2)."""
+    h = y1 - y0
+    t = (np.asarray(y, float) - y0) / h
+    return ((1 - 10 * t ** 3 + 15 * t ** 4 - 6 * t ** 5) * p0 + (t - 6 * t ** 3 + 8 * t ** 4 - 3 * t ** 5) * h * d0
+            + (0.5 * t ** 2 - 1.5 * t ** 3 + 1.5 * t ** 4 - 0.5 * t ** 5) * h * h * a0
+            + (10 * t ** 3 - 15 * t ** 4 + 6 * t ** 5) * p1 + (-4 * t ** 3 + 7 * t ** 4 - 3 * t ** 5) * h * d1
+            + (0.5 * t ** 3 - t ** 4 + 0.5 * t ** 5) * h * h * a1)
+
+
+RIDGE_Y0, RIDGE_K_END = 88.0, 0.2
+_c3 = _row_raw(np.array([RIDGE_Y0 - 0.01, RIDGE_Y0, RIDGE_Y0 + 0.01]))[0]
+_RIDGE = (RIDGE_Y0, TIP_Y, _c3[1], (_c3[2] - _c3[0]) / 0.02, (_c3[2] - 2 * _c3[1] + _c3[0]) / 1e-4,
+          TIP_Z, RIDGE_K_END, 0.0)
+
+
+def row_scale(y):
+    """Edge-line (ridge) height c and the scales of the profile's top part (st) and bottom part (sb) for the
+    section at y; the section's centre reaches the side drawing's top and bottom silhouettes. Up to Y 88 both parts
+    share one scale (the measured front section, shifted and scaled). Behind it the ridge follows a smooth curve
+    rising to the nose tip and the two parts are scaled apart: with one scale the drawing's rounded tip would put a
+    dip into the ridge right at the tip."""
+    c, st, sb, um, lm = _row_raw(y)
+    y = np.ravel(np.asarray(y, float))
+    c = np.where(y > RIDGE_Y0, _hermite5(np.clip(y, RIDGE_Y0, TIP_Y), *_RIDGE), c)
+    s_t = (st - c) / np.maximum(um, 1e-9)
+    s_b = (c - sb) / np.maximum(lm, 1e-9)
+    if _TIP_S is not None:
+        # towards the tip the scales level off smoothly instead of chasing the drawing's tip round exactly (its
+        # circle and the section's profile differ in shape right at the tip, which would wrinkle the surface): the
+        # nose top stays concave and within 0.27 mm of the drawing, the back face within 0.07 mm
+        (yt0, st_end, t3), (yb0, sb_end, b3) = _TIP_S
+        s_t = np.where(y > yt0, _hermite5(np.clip(y, yt0, TIP_Y), yt0, TIP_Y, *t3, st_end, 0.0, 0.0), s_t)
+        s_b = np.where(y > yb0, _hermite5(np.clip(y, yb0, TIP_Y), yb0, TIP_Y, *b3, sb_end, 0.0, 0.0), s_b)
+    return c, s_t, s_b
+
+
+def _jet(y0, i):
+    """Value, slope and curvature of the raw scale i (1 top, 2 bottom) at y0."""
+    v = row_scale(np.array([y0 - 0.01, y0, y0 + 0.01]))[i]
+    return v[1], (v[2] - v[0]) / 0.02, (v[2] - 2 * v[1] + v[0]) / 1e-4
+
+
+_TIP_S = None
+_TIP_S = ((92.0, 0.865, _jet(92.0, 1)), (94.0, 0.308, _jet(94.0, 2)))
+
+
+_Ur_tab = np.gradient(_U_tab, _RR)
+_Lr_tab = np.gradient(_L_tab, _RR)
+
+
+def surface_normals(p):
+    """Analytic outward normals of the head surface at points p (n, 3) lying on it (top part where z >= the
+    edge line, bottom part below). Written in r = sqrt(d), so they stay finite at the outline, where the top and
+    the wall meet with a vertical tangent (both give the outline's outward normal there)."""
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
+    k, dk = corner_squash(y)
+    d = np.clip(dist(x * k, y), 0, 53.0)
+    g0 = dist_grad(x * k, y)
+    g = np.stack([g0[:, 0] * k, g0[:, 1] + g0[:, 0] * x * dk], 1)       # chain rule through the sideways squeeze
+    r = np.sqrt(d)
+    c, st, sb = row_scale(y)
+    h = np.minimum(0.004, np.maximum(y, 1e-4) * 0.5)
+    lo = np.maximum(y - h, 0.0)
+    hi = np.minimum(y + h, TIP_Y - 0.004)
+    c1, st1, sb1 = row_scale(hi)
+    c0, st0, sb0 = row_scale(lo)
+    dy = np.maximum(hi - lo, 1e-9)
+    dc, dst, dsb = (c1 - c0) / dy, (st1 - st0) / dy, (sb1 - sb0) / dy
+    u, ur = np.interp(r, _RR, _U_tab), np.interp(r, _RR, _Ur_tab)
+    l_, lr = np.interp(r, _RR, _L_tab), np.interp(r, _RR, _Lr_tab)
+    top = z >= c - 1e-6
+    n = np.where(top[:, None],
+                 np.stack([-st * ur * g[:, 0], -2 * r * (dc + u * dst) - st * ur * g[:, 1], 2 * r], 1),
+                 np.stack([-sb * lr * g[:, 0], 2 * r * (dc - l_ * dsb) - sb * lr * g[:, 1], -2 * r], 1))
+    on_edge = d < 1e-6                       # on the outline itself (and the nose tip): the outline's outward normal
+    n[on_edge] = np.stack([-g[on_edge, 0], -g[on_edge, 1], np.zeros(on_edge.sum())], 1)
+    n[y < 1e-6] = (0.0, -1.0, 0.0)           # the face plate's front edge rounds over to the face (vertical tangent)
+    return n / np.linalg.norm(n, axis=1, keepdims=True)
 
 
 # ================================================================ Blender helpers
@@ -324,11 +513,11 @@ def brass(name, engraved=False):
     nt.links.new(world_vec(nt, (1, 0, 0)), b.inputs["Tangent"])
     coord = nt.nodes.new("ShaderNodeTexCoord")
     mp = node(nt, "ShaderNodeMapping")
-    mp.inputs["Scale"].default_value = (0.002, 3.0, 3.0)          # object space is mm: fine hairlines along X
+    mp.inputs["Scale"].default_value = (0.002, 9.0, 9.0)          # object space is mm: fine hairlines along X
     nt.links.new(coord.outputs["Object"], mp.inputs["Vector"])
     nz = node(nt, "ShaderNodeTexNoise", Scale=1.0, Detail=12.0, Roughness=0.7)
     nt.links.new(mp.outputs["Vector"], nz.inputs["Vector"])
-    hair = node(nt, "ShaderNodeBump", Strength=0.08, Distance=0.00002)
+    hair = node(nt, "ShaderNodeBump", Strength=0.06, Distance=0.00002)
     nt.links.new(nz.outputs["Fac"], hair.inputs["Height"])
     normal = hair.outputs["Normal"]
     rough = node(nt, "ShaderNodeMapRange", **{"From Min": 0.3, "From Max": 0.7, "To Min": 0.17, "To Max": 0.25})
@@ -463,30 +652,28 @@ I_LACQ, I_TOP, I_HEEL, I_TOE, I_CARBON, I_BRASS, I_SOLE, I_SEAM = range(8)
 SEAM = 0.16                                   # glue line between the carbon face plate and the maple body
 
 # ================================================================ head surface
-rows = np.concatenate([[0.0, 0.04, 0.1, 0.18, 0.3, 0.45, 0.65, 0.9, 1.25, 1.75, 2.5], np.arange(3.1, 90.0, 0.4),
-                       np.arange(90.0, TIP_Y - 0.3, 0.25), [TIP_Y - 0.22, TIP_Y - 0.12, TIP_Y - 0.05]])
+# rows: 3 deg steps over the face plate's 1 mm front round, 0.4 mm along the body, 0.1 mm over the nose (its round
+# turns fast; coarse rows show as stair steps in the reflections)
+_phi = np.radians(np.arange(0.0, 90.0, 3.0))
+rows = np.concatenate([FRONT_R * (1 - np.cos(_phi)), [1.25, 1.75, 2.5], np.arange(3.1, 86.0, 0.4),
+                       np.arange(86.0, TIP_Y - 0.15, 0.1), [TIP_Y - 0.1, TIP_Y - 0.06, TIP_Y - 0.03, TIP_Y - 0.012]])
 rows = np.unique(np.concatenate([rows, [FACE_T, NOSE_Y, 41.3 * K_Y, 42.7 * K_Y]]))
 N = 181
 cheb = -np.cos(np.pi * np.arange(N) / (N - 1))                  # -1 .. 1, dense near both edges
 bm = bmesh.new()
 top_rows, bot_rows = [], []
 for y in rows:
-    w = float(half_width(y))
-    xs = cheb * w
-    d = dist(xs, np.full(N, y))
+    xs = cheb * float(half_width(y))
+    d = dist(cheb * float(_hw_core(y)), np.full(N, y))               # sideways squeeze at the face corners
     d[0] = d[-1] = 0.0
-    dm = float(dist(np.array([0.0]), np.array([y]))[0])
-    st, sb = float(s_top(y)), float(s_bot(y))
-    u_m, l_m = float(U(dm)), float(L(dm))
-    s = (st - sb) / max(u_m + l_m, 1e-6)
-    c = st - u_m * s
-    zt = c + U(d) * s
-    zb = c - L(d) * s
+    c, s_t, s_b = (float(v[0]) for v in row_scale(np.array([y])))
+    zt = c + U(d) * s_t
+    zb = c - L(d) * s_b
     tr = [bm.verts.new((float(x), float(y), float(z))) for x, z in zip(xs, zt)]
     br = [tr[0]] + [bm.verts.new((float(x), float(y), float(z))) for x, z in zip(xs[1:-1], zb[1:-1])] + [tr[-1]]
     top_rows.append(tr)
     bot_rows.append(br)
-tip = bm.verts.new((0.0, TIP_Y, float(s_top(TIP_Y - 0.02) * 0.5 + s_bot(TIP_Y - 0.02) * 0.5)))
+tip = bm.verts.new((0.0, TIP_Y, TIP_Z))
 for i in range(len(rows) - 1):
     for j in range(N - 1):
         bm.faces.new((top_rows[i][j], top_rows[i + 1][j], top_rows[i + 1][j + 1], top_rows[i][j + 1]))
@@ -547,7 +734,27 @@ for f in bm.faces:
 head = mesh_obj("DP501_Head", bm)
 for m in HEAD_MATS:
     head.data.materials.append(m)
-head.data.set_sharp_from_angle(angle=math.radians(40))
+# smooth shading from the surface's own normals (not from the triangles): even reflections on the rounds and the nose
+_me = head.data
+_co = np.zeros(len(_me.vertices) * 3)
+_me.vertices.foreach_get("co", _co)
+_vn = surface_normals(_co.reshape(-1, 3))
+_lv = np.zeros(len(_me.loops), dtype=np.int64)
+_me.loops.foreach_get("vertex_index", _lv)
+_ln = _vn[_lv]
+_pn = np.zeros(len(_me.polygons) * 3)
+_me.polygons.foreach_get("normal", _pn)
+_pn = _pn.reshape(-1, 3)
+_ps = np.zeros(len(_me.polygons), dtype=np.int64)
+_me.polygons.foreach_get("loop_start", _ps)
+_pt = np.zeros(len(_me.polygons), dtype=np.int64)
+_me.polygons.foreach_get("loop_total", _pt)
+_pc = np.zeros(len(_me.polygons) * 3)
+_me.polygons.foreach_get("center", _pc)
+_pc = _pc.reshape(-1, 3)
+for i in np.nonzero((_pn[:, 1] < -0.99) & (_pc[:, 1] < 0.02))[0]:        # the flat carbon face keeps its own normal
+    _ln[_ps[i]:_ps[i] + _pt[i]] = (0.0, -1.0, 0.0)
+_me.normals_split_custom_set([tuple(v) for v in _ln])
 
 # ---- brass pins in the face, flush, slightly domed
 pins = []
@@ -700,8 +907,35 @@ scene.view_settings.view_transform = "AgX"
 scene.view_settings.look = "AgX - Medium High Contrast"
 world = bpy.data.worlds.new("studio")
 world.use_nodes = True
-world.node_tree.nodes["Background"].inputs["Color"].default_value = (0.05, 0.05, 0.053, 1)
-world.node_tree.nodes["Background"].inputs["Strength"].default_value = 1.0
+# (height of the direction z = -1 .. 1, brightness): a bright floor well below the horizon (the brass sole and the lower
+# curves face it), a dark band round the horizon (keeps the lacquer walls black), a dim overhead
+WORLD_STOPS = [(-1.0, 0.50), (-0.62, 0.50), (-0.30, 0.04), (0.10, 0.04), (1.0, 0.14)]
+if os.environ.get("WORLD_STOPS"):
+    WORLD_STOPS = [tuple(map(float, t.split(":"))) for t in os.environ["WORLD_STOPS"].split(",")]
+
+
+def studio_world(stops=WORLD_STOPS):
+    """Soft studio dome, seen only in reflections (the background is composited)."""
+    nt = world.node_tree
+    bg = nt.nodes["Background"]
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(tc.outputs["Generated"], sep.inputs[0])
+    mr = node(nt, "ShaderNodeMapRange", **{"From Min": -1.0, "From Max": 1.0})
+    nt.links.new(sep.outputs["Z"], mr.inputs["Value"])
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    els = ramp.color_ramp.elements
+    while len(els) < len(stops):
+        els.new(0.5)
+    for e, (z, v) in zip(els, stops):
+        e.position = (z + 1) / 2
+        e.color = (v, v, v * 1.03, 1)
+    nt.links.new(mr.outputs["Result"], ramp.inputs["Fac"])
+    nt.links.new(ramp.outputs["Color"], bg.inputs["Color"])
+    bg.inputs["Strength"].default_value = 1.0
+
+
+studio_world()
 scene.world = world
 cam_data = bpy.data.cameras.new("cam")
 cam_data.clip_start = 0.001
