@@ -503,7 +503,7 @@ def lacquer(name, decal=None):
 BRASS = (0.86, 0.60, 0.19, 1)
 
 
-def brass(name, engraved=False):
+def brass(name, engraved=False, rough_range=(0.17, 0.25)):
     """Brushed brass, grain along X (toe-heel). Engraved: sand-blasted logos (recessed, sparkly), black DP-501,
     screw outlines; textures on UV 'sole' (planar from below)."""
     m, nt, b = principled(name)
@@ -521,7 +521,8 @@ def brass(name, engraved=False):
     hair = node(nt, "ShaderNodeBump", Strength=0.06, Distance=0.00002)
     nt.links.new(nz.outputs["Fac"], hair.inputs["Height"])
     normal = hair.outputs["Normal"]
-    rough = node(nt, "ShaderNodeMapRange", **{"From Min": 0.3, "From Max": 0.7, "To Min": 0.17, "To Max": 0.25})
+    rough = node(nt, "ShaderNodeMapRange", **{"From Min": 0.3, "From Max": 0.7, "To Min": rough_range[0],
+                                              "To Max": rough_range[1]})
     nt.links.new(nz.outputs["Fac"], rough.inputs["Value"])
     rough = rough.outputs["Result"]
     color = BRASS
@@ -584,7 +585,7 @@ def carbon_mat():
     nt.links.new(t.outputs["Color"], sep.inputs[0])
     warp, height, streak = sep.outputs[0], sep.outputs[1], sep.outputs[2]
     base_dark = (0.010, 0.010, 0.011, 1)
-    base_light = (0.045, 0.045, 0.048, 1)
+    base_light = (0.07, 0.07, 0.074, 1)
     hs = nt.nodes.new("ShaderNodeMath")
     hs.operation = "MULTIPLY"
     nt.links.new(height, hs.inputs[0])
@@ -592,7 +593,7 @@ def carbon_mat():
     nt.links.new(streak, sk.inputs["Value"])
     nt.links.new(sk.outputs["Result"], hs.inputs[1])
     nt.links.new(mix_rgb(nt, hs.outputs[0], base_dark, base_light), b.inputs["Base Color"])
-    b.inputs["Metallic"].default_value = 0.55
+    b.inputs["Metallic"].default_value = 0.65
     b.inputs["Roughness"].default_value = 0.3
     b.inputs["Anisotropic"].default_value = 0.9
     tan = nt.nodes.new("ShaderNodeMix")
@@ -646,7 +647,7 @@ M_TOE = lacquer("DP501_ToeLettering", "side_toe.png")
 M_CARBON = carbon_mat()
 M_BRASS = brass("DP501_Brass")
 M_SOLE = brass("DP501_SoleEngraved", engraved=True)
-M_PIN = simple("DP501_FacePin", (0.88, 0.64, 0.24, 1), 1.0, 0.3)
+M_PIN = brass("DP501_FacePin", rough_range=(0.32, 0.42))     # brushed like the photo's pins, a little more satin
 M_SEAM = simple("DP501_FacePlateSeam", (0.002, 0.002, 0.002, 1), 0.0, 0.55)
 HEAD_MATS = [M_LACQ, M_TOP, M_HEEL, M_TOE, M_CARBON, M_BRASS, M_SOLE, M_SEAM]
 I_LACQ, I_TOP, I_HEEL, I_TOE, I_CARBON, I_BRASS, I_SOLE, I_SEAM = range(8)
