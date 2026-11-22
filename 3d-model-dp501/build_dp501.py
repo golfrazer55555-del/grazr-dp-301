@@ -1083,9 +1083,11 @@ shot("08_full", mid + Vector((-0.75, -2.3, 0.2)), mid, 85,
       ("rim", mid + Vector((0.3, 1.3, 0.9)), mid, 1.0, 60)], res=(1200, 1600))
 sc = axis(WRAP[0] + 125) * 0.001
 toe_view = Vector(FRONT) * 0.36
+# strip lights to the sides: thin crisp highlights along the shaft's edges (as in the photos), print left readable
 shot("09_shaft", sc + toe_view + mm(0, -40, 0), sc, 85,
-     [("key", sc + Vector(FRONT) * 0.3 + Vector((0, -0.25, 0.15)), sc, 0.5, 9.0),
-      ("fill", sc + Vector(FRONT) * 0.3 + Vector((0, 0.3, -0.05)), sc, 0.6, 4.0)],
+     [("key", sc + Vector(FRONT) * 0.22 + Vector((0, -0.30, 0.10)), sc, (0.06, 0.6), 6.0),
+      ("fill", sc + Vector(FRONT) * 0.22 + Vector((0, 0.32, 0.0)), sc, (0.05, 0.6), 3.0),
+      ("soft", sc + Vector(FRONT) * 0.45 + Vector((0, 0.0, 0.45)), sc, 0.8, 3.0)],
      up=tuple(D), res=(1200, 1600))
 gc = axis(CLUB_LEN - 175) * 0.001
 shot("10_grip", gc + Vector(FRONT) * 0.5 + mm(0, -60, 0), gc, 85,
