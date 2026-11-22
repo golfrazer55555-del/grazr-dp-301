@@ -16,11 +16,15 @@
 측정, 두 사진이 서로 일치)을 d의 함수로 써서 윗면·아랫면 높이를 정합니다. Y마다 단면을 옆면 도안의 위·아래 실루엣에
 맞춰 늘리고 옮기므로, 윗면 도안·옆면 도안·앞뒤 단면이 동시에 맞습니다.
 
+옆면 실루엣은 도안을 1픽셀 열마다 측정해 맞췄고(오차 rms 0.02~0.05 mm), 뒤쪽 황동 무게추의 모서리선은 끝까지 매끈하게
+올라가도록 단면의 위·아래를 따로 늘립니다. 표면 법선은 삼각형이 아니라 곡면 식에서 직접 계산해 반사가 고르게 보입니다.
+
 ## 다시 빌드
 ```bash
 pip install bpy==5.3.0 pillow opencv-python-headless scipy
 python3 3d-model-dp501/make_textures.py
 python3 3d-model-dp501/build_dp501.py                  # 확인용 렌더 10장
 python3 3d-model-dp501/build_dp501.py --ortho          # 정사영 확인 뷰
+python3 3d-model-dp501/build_dp501.py --site           # 웹사이트용 어두운 배경 이미지 (site/)
 python3 3d-model-dp501/compare_views.py                # 도안과 겹쳐 보기
 ```

@@ -30,6 +30,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 TEX = os.path.join(HERE, "textures")
 RENDER = "--no-render" not in sys.argv
 ORTHO = "--ortho" in sys.argv
+SITE = "--site" in sys.argv               # dark-studio stills for the website (site/) instead of the approval set
 SAMPLES = int(os.environ.get("SAMPLES", "128"))
 
 # ================================================================ measured shape (SPEC.md)
@@ -994,7 +995,13 @@ def shot(name, loc, target, lens, lights, up=(0, 0, 1), head_only=False, res=(16
     im = bpy.data.images.load(path)
     px = np.array(im.pixels[:]).reshape(-1, 4)
     a = px[:, 3:4]
-    px[:, :3] = px[:, :3] * a + bg * (1 - a)
+    back = np.full((len(px), 1), bg)
+    if bg < 0.5:                              # dark studio: a faint glow behind the club, black towards the edges
+        W, H = res
+        k = np.arange(len(px))
+        gx, gy = (k % W) / W - 0.5, (k // W) / H - 0.42
+        back += 0.035 * np.clip(1.0 - (gx * gx + gy * gy) / 0.22, 0, None)[:, None]
+    px[:, :3] = px[:, :3] * a + back * (1 - a)
     px[:, 3] = 1.0
     im.pixels = px.ravel()
     im.save()
@@ -1028,6 +1035,38 @@ if ORTHO:
     shot("bottom", HC + mm(0, 0, -400), HC, 0, flat, up=(0, -1, 0), **o)
     shot("front", HC + mm(0, -400, 0), HC, 0, flat, **o)
     shot("back", HC + mm(0, 400, 0), HC, 0, flat, **o)
+    sys.exit(0)
+
+if SITE:
+    dark = dict(bg=0.0, folder="site")
+    key = lambda c, d=0.7: [
+        ("key", c + Vector((-0.35, -0.30, 0.40)) * d, c, 0.35 * d, 9.0),
+        ("rim", c + Vector((0.30, 0.55, 0.30)) * d, c, 0.25 * d, 10.0),
+        ("rim2", c + Vector((-0.45, 0.45, 0.20)) * d, c, 0.25 * d, 6.0),
+        ("strip", c + Vector((0.55, -0.20, 0.25)) * d, c, 0.12 * d, 3.5),
+        ("low", c + Vector((-0.10, -0.30, -0.36)) * d, c, 0.6 * d, 1.5, (1.0, 0.92, 0.8)),
+    ]
+    shot("hero", HC + Vector((-0.30, -0.24, 0.13)), HC + Vector((0.035, 0.01, 0.010)), 70, key(HC), res=(1920, 1080),
+         **dark)
+    shot("hero_m", HC + Vector((-0.22, -0.30, 0.16)), HC + Vector((0.0, 0.0, 0.03)), 60, key(HC), res=(1080, 1350),
+         **dark)
+    mid = axis(430) * 0.001
+    full_l = [("key", mid + Vector((-0.8, -1.5, 1.2)), mid, 1.0, 70), ("rim", mid + Vector((0.6, 1.2, 0.8)), mid, 0.8, 60),
+              ("rim2", mid + Vector((-1.0, 0.8, 0.3)), mid, 0.8, 35)]
+    shot("full", mid + Vector((-0.7, -2.2, 0.35)), mid, 85, full_l, res=(1200, 1500), **dark)
+    shot("card", HC + Vector((-0.26, -0.28, 0.30)), HC + Vector((0.01, 0.0, 0.05)), 50, key(HC), res=(1200, 1500),
+         **dark)
+    back_c = mm(0, 84, 26)
+    shot("f_brass", back_c + Vector((0.16, 0.24, 0.10)), back_c, 85, key(back_c, 0.6), res=(1280, 960),
+         head_only=True, **dark)
+    shot("f_maple", HC + Vector((0.40, -0.10, 0.06)), HC, 85, key(HC), res=(1280, 960), head_only=True, **dark)
+    sc = axis(WRAP[0] + 125) * 0.001
+    shot("f_shaft", sc + Vector(FRONT) * 0.30 + mm(0, -40, 0), sc, 85, key(sc, 0.5), up=tuple(D), res=(1280, 960),
+         **dark)
+    shot("f_aim", HC + Vector((0.10, 0.05, 0.38)), HC, 70, key(HC), up=(-1, 0, 0), res=(1280, 960), **dark)
+    shot("poster", HC + Vector((-0.30, -0.26, 0.20)), HC + Vector((0.0, 0.0, 0.03)), 60, key(HC), res=(1280, 720),
+         **dark)
+    print("done")
     sys.exit(0)
 
 shot("01_hero", HC + mm(-300, -340, 230), HC + mm(4, 0, 10), 85, studio())
