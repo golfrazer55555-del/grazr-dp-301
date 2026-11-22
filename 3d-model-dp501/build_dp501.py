@@ -38,20 +38,67 @@ NOSE_Y = 81.0
 BRASS_Z0, BRASS_Z1 = 17.5, 19.5          # brass / lacquer line on the sides at Y = FACE_T and Y = NOSE_Y
 K_Y = 95.0 / 94.4                        # side drawing length -> top drawing length
 
-# top-view half width (top + bottom drawings agree)
-PLAN = [(2.5, 53.0), (26.0, 53.0), (26.5, 52.85), (29.3, 52.6), (32.0, 52.2), (34.8, 51.7), (37.6, 51.1),
-        (40.3, 50.3), (43.1, 49.4), (45.8, 48.5), (48.6, 47.4), (51.3, 46.2), (54.1, 44.9), (56.8, 43.5),
-        (59.6, 41.9), (62.3, 40.2), (65.1, 38.4), (67.8, 36.4), (70.6, 34.4), (73.3, 32.2), (76.1, 29.8),
-        (78.8, 27.1), (81.6, 24.4), (84.3, 21.4), (87.1, 17.9), (89.8, 13.9), (92.6, 9.0), (94.2, 5.0),
-        (94.8, 2.4), (95.0, 0.0)]
-CORNER_R = 2.5
-# side-view silhouettes (heel drawing, heights x 56/53, lengths x K_Y)
-S_TOP = [(0, 56.0), (51.0, 56.0), (52.3, 55.9), (54.4, 55.6), (56.4, 55.3), (58.5, 55.0), (60.5, 54.75),
-         (62.6, 54.5), (64.7, 54.15), (66.7, 53.8), (74.9, 52.4), (77.0, 52.0), (79.0, 51.5), (81.1, 51.1),
-         (83.2, 50.7), (85.2, 50.1), (87.3, 49.5), (89.3, 48.8), (91.4, 47.9), (93.4, 46.8), (94.4, 43.6)]
-S_BOT = [(0, 0.0), (41.3, 0.0), (42.7, 0.12), (44.1, 0.62), (46.2, 1.45), (50.0, 2.95), (55.0, 4.95),
-         (60.0, 6.95), (65.0, 8.95), (70.0, 10.95), (75.0, 12.95), (80.0, 14.95), (85.0, 17.05), (87.3, 18.4),
-         (89.3, 21.4), (91.4, 30.4), (93.4, 39.8), (94.4, 43.6)]
+# top-view outline: the measured points of the top and bottom drawings fit a superellipse behind Y = 26
+# (rms 0.13 mm, max 0.4 mm), so the smooth curve is used instead of the noisy points
+SE_Y0, SE_N, SE_M = 26.19, 1.592, 1.6
+CORNER_R = 1.0                                # small vertical round on the face plate corners
+K_Y = 95.0 / 94.4                            # side drawing length -> top drawing length
+
+
+def _se_xy(th):
+    return 53.0 * np.cos(th) ** (2 / SE_N), SE_Y0 + (HEAD_D - SE_Y0) * np.sin(th) ** (2 / SE_M)
+
+
+def _tip_arc(R=7.0):
+    """Round the superellipse's point with a circle of radius R tangent to it (the drawing's nose is rounded)."""
+    th = np.linspace(0.05, np.pi / 2 - 1e-4, 20000)
+    x, y = _se_xy(th)
+    dx, dy = np.gradient(x, th), np.gradient(y, th)
+    nx, ny = -dy, dx                                         # inward normal (towards the centre line)
+    nn = np.hypot(nx, ny)
+    nx, ny = nx / nn, ny / nn
+    t = -x / nx                                              # normal line meets the centre line X = 0
+    yc = y + t * ny
+    i = int(np.argmin(np.abs(t - R)))
+    return float(th[i]), float(y[i]), float(yc[i]), float(t[i])
+
+
+TH_T, Y_T, Y_C, TIP_R = _tip_arc()
+TIP_Y = Y_C + TIP_R                                          # back end of the head (about 95)
+
+
+def half_width(y):
+    y = np.asarray(y, float)
+    t = np.clip((y - SE_Y0) / (HEAD_D - SE_Y0), 0, 1)
+    w = 53.0 * np.clip(1 - t ** SE_M, 0, 1) ** (1 / SE_N)
+    arc = np.sqrt(np.clip(TIP_R ** 2 - (y - Y_C) ** 2, 0, None))
+    w = np.where(y > Y_T, arc, w)
+    corner = 53.0 - CORNER_R + np.sqrt(np.clip(CORNER_R ** 2 - (CORNER_R - y) ** 2, 0, None))
+    return np.where(y < CORNER_R, corner, w)
+
+
+def _top_line(y):
+    """Side drawing top silhouette: flat to Y 46, then 56 - 0.0082 (Y-46)^1.8 (rms 0.21 mm to the drawing);
+    the last 1.5 mm rounds down into the nose tip at 43.6."""
+    y = np.asarray(y, float)
+    z = 56.0 - 0.00819673 * np.clip(y - 46.0, 0, None) ** 1.79798
+    z95 = 56.0 - 0.00819673 * (95.0 - 46.0) ** 1.79798
+    return z - (z95 - 43.6) * np.clip((y - 93.5) / 1.5, 0, 1) ** 2.2
+
+
+def _bot_line(y):
+    """Side drawing bottom silhouette: flat, then a straight 22 deg rise (z = 0.4037 Y - 17.41, residual < 0.15 mm)
+    with a soft start, then the nose end rising into the tip (measured points)."""
+    y = np.asarray(y, float)
+    k = 0.6
+    return k * np.log1p(np.exp((0.40372 * y - 17.4084) / k))
+
+
+_ys = np.arange(0.0, 93.51, 0.5)
+_st = PchipInterpolator(_ys.tolist() + [94.0, 94.5, 95.0], _top_line(np.concatenate([_ys, [94.0, 94.5, 95.0]])))
+_yb = np.arange(0.0, 87.51, 0.5)
+_sb = PchipInterpolator(_yb.tolist() + [89.9, 92.0, 94.0, 95.0],
+                        np.concatenate([_bot_line(_yb), [21.4, 30.4, 39.8, 43.6]]))
 # front cross-section half profile (x, z): top round, outward-leaning wall, lower curve, flat sole
 TOP_PROFILE = [(0, 56.0), (25.0, 56.0), (27.0, 55.92), (31.0, 55.4), (35.0, 54.5), (38.5, 53.3), (41.5, 51.9),
                (44.2, 50.2), (46.6, 48.4), (48.8, 46.5), (50.6, 44.6), (51.9, 42.8), (52.7, 41.3), (53.0, 40.0)]
@@ -80,17 +127,6 @@ def pchip(tab):
     return lambda x: f(np.clip(x, xs[0], xs[-1]))
 
 
-W_tab = pchip(PLAN)
-
-
-def half_width(y):
-    y = np.asarray(y, float)
-    corner = (CORNER_R - CORNER_R) + (53.0 - CORNER_R) + np.sqrt(np.clip(CORNER_R ** 2 - (CORNER_R - y) ** 2, 0, None))
-    return np.where(y < CORNER_R, corner, W_tab(y))
-
-
-_st = pchip([(y * K_Y, z) for y, z in S_TOP])
-_sb = pchip([(y * K_Y, z) for y, z in S_BOT])
 FRONT_R = 1.0                                 # small round on the face plate's top / bottom front edges
 
 
@@ -99,29 +135,56 @@ def _front_round(y):
     return np.where(y < FRONT_R, FRONT_R - np.sqrt(np.clip(FRONT_R ** 2 - (FRONT_R - y) ** 2, 0, None)), 0.0)
 
 
-s_top = lambda y: _st(y) - _front_round(y)
-s_bot = lambda y: _sb(y) + _front_round(y)
+s_top = lambda y: _st(np.clip(np.asarray(y, float) * 95.0 / TIP_Y, 0, 95.0)) - _front_round(y)
+s_bot = lambda y: _sb(np.clip(np.asarray(y, float) * 95.0 / TIP_Y, 0, 95.0)) + _front_round(y)
 _top = pchip(TOP_PROFILE)
 _bot = pchip(BOT_PROFILE)
-U = lambda d: _top(53.0 - np.clip(d, 0, 53.0)) - EDGE_Z          # height of the top above the edge line
-L = lambda d: EDGE_Z - _bot(53.0 - np.clip(d, 0, 53.0))          # depth of the bottom below the edge line
+# The profile points are joined by PCHIP, which is only C1: its curvature jumps at every point and that shows
+# as wavy edges in the lacquer reflections. Both curves leave the outline vertically (height ~ sqrt(d)), so they
+# are smoothed in r = sqrt(d) with an odd extension through r = 0: U(0) = L(0) = 0 and the top and the wall still
+# meet tangentially at the outline, while the curvature is evened out (about 0.3 mm near the edge, 1.5 mm inside).
+from scipy.ndimage import gaussian_filter1d  # noqa: E402
+_RR = np.arange(-7.5, 7.5001, 0.002)
+_rd = np.clip(_RR ** 2, 0, 53.0)
+_U_tab = gaussian_filter1d(np.sign(_RR) * (_top(53.0 - _rd) - EDGE_Z), 75.0, mode="nearest")
+_L_tab = gaussian_filter1d(np.sign(_RR) * (EDGE_Z - _bot(53.0 - _rd)), 75.0, mode="nearest")
+U = lambda d: np.interp(np.sqrt(np.clip(d, 0, 53.0)), _RR, _U_tab)   # height of the top above the edge line
+L = lambda d: np.interp(np.sqrt(np.clip(d, 0, 53.0)), _RR, _L_tab)   # depth of the bottom below the edge line
 
-# outline polyline (toe side -> tip -> heel side), the face edge left out
-ys_o = np.concatenate([np.linspace(0, 2.5, 120), np.linspace(2.5, 90, 1600), np.linspace(90, 95, 600)[1:]])
-ws_o = half_width(ys_o)
-outline = np.concatenate([np.stack([-ws_o, ys_o], 1), np.stack([ws_o[::-1][1:], ys_o[::-1][1:]], 1)])
-# densify
-seg = np.linalg.norm(np.diff(outline, axis=0), axis=1)
-dense = [outline[0]]
-for p0, p1, ln in zip(outline[:-1], outline[1:], seg):
-    k = max(1, int(ln / 0.04))
-    for t in np.arange(1, k + 1) / k:
-        dense.append(p0 + (p1 - p0) * t)
-TREE = cKDTree(np.array(dense))
+# outline (toe side -> tip -> heel side, the face edge left out), sampled densely
+_th = np.linspace(0, TH_T, 6000)
+_w, _y = _se_xy(_th)
+_ph = np.linspace(np.arctan2(Y_T - Y_C, float(half_width(Y_T))), np.pi / 2, 1500)
+_w = np.concatenate([_w, TIP_R * np.cos(_ph)])
+_y = np.concatenate([_y, Y_C + TIP_R * np.sin(_ph)])
+_yc = np.linspace(0, SE_Y0, 2000)
+heel = np.concatenate([np.stack([half_width(_yc), _yc], 1), np.stack([_w, _y], 1)])
+outline = np.concatenate([heel * [-1, 1], heel[::-1][1:]])
+TREE = cKDTree(outline)
+
+# signed distance on a 0.1 mm grid, mirrored at the face plane, blurred (sigma 2 mm): the rounds keep their
+# exact size near the outline, while the crease the plain distance has along the centre line at the back is
+# smoothed out (otherwise it shows as a kinked ridge and lumpy reflections)
+GX = np.arange(-58.0, 58.0001, 0.1)
+GY = np.arange(-6.0, 100.0001, 0.1)
+_XX, _YY = np.meshgrid(GX, GY, indexing="ij")
+_ay = np.abs(_YY)
+_d = TREE.query(np.stack([_XX.ravel(), _ay.ravel()], 1))[0].reshape(_XX.shape)
+_inside = (np.abs(_XX) <= half_width(np.minimum(_ay, TIP_Y))) & (_ay <= TIP_Y)
+from scipy.ndimage import gaussian_filter, map_coordinates, spline_filter  # noqa: E402
+SDF = spline_filter(gaussian_filter(np.where(_inside, _d, -_d), sigma=25.0), order=3)   # cubic: smooth normals
 
 
 def dist(x, y):
-    return TREE.query(np.stack([np.ravel(x), np.ravel(y)], 1))[0].reshape(np.shape(x))
+    """Exact distance to the outline near it (keeps the rounds and the nose tip true); the blurred field only
+    takes over deeper inside (from 3 to 8 mm), where it smooths the centre-line crease."""
+    x = np.ravel(np.asarray(x, float))
+    y = np.ravel(np.asarray(y, float))
+    dt = TREE.query(np.stack([x, np.abs(y)], 1))[0]
+    db = map_coordinates(SDF, [(x - GX[0]) / 0.1, (y - GY[0]) / 0.1], order=3, mode="nearest", prefilter=False)
+    w = np.clip((dt - 3.0) / 5.0, 0, 1)
+    w = w * w * (3 - 2 * w)
+    return dt * (1 - w) + np.minimum(db, dt) * w
 
 
 # ================================================================ Blender helpers
@@ -400,8 +463,8 @@ I_LACQ, I_TOP, I_HEEL, I_TOE, I_CARBON, I_BRASS, I_SOLE, I_SEAM = range(8)
 SEAM = 0.16                                   # glue line between the carbon face plate and the maple body
 
 # ================================================================ head surface
-rows = np.concatenate([[0.0, 0.12, 0.3, 0.55, 0.85, 1.25, 1.75, 2.5], np.arange(3.1, 90.0, 0.6),
-                       np.arange(90.0, 94.7, 0.25), [94.75, 94.88]])
+rows = np.concatenate([[0.0, 0.04, 0.1, 0.18, 0.3, 0.45, 0.65, 0.9, 1.25, 1.75, 2.5], np.arange(3.1, 90.0, 0.4),
+                       np.arange(90.0, TIP_Y - 0.3, 0.25), [TIP_Y - 0.22, TIP_Y - 0.12, TIP_Y - 0.05]])
 rows = np.unique(np.concatenate([rows, [FACE_T, NOSE_Y, 41.3 * K_Y, 42.7 * K_Y]]))
 N = 181
 cheb = -np.cos(np.pi * np.arange(N) / (N - 1))                  # -1 .. 1, dense near both edges
@@ -423,7 +486,7 @@ for y in rows:
     br = [tr[0]] + [bm.verts.new((float(x), float(y), float(z))) for x, z in zip(xs[1:-1], zb[1:-1])] + [tr[-1]]
     top_rows.append(tr)
     bot_rows.append(br)
-tip = bm.verts.new((0.0, HEAD_D, float(s_top(HEAD_D - 0.05) * 0.5 + s_bot(HEAD_D - 0.05) * 0.5)))
+tip = bm.verts.new((0.0, TIP_Y, float(s_top(TIP_Y - 0.02) * 0.5 + s_bot(TIP_Y - 0.02) * 0.5)))
 for i in range(len(rows) - 1):
     for j in range(N - 1):
         bm.faces.new((top_rows[i][j], top_rows[i + 1][j], top_rows[i + 1][j + 1], top_rows[i][j + 1]))
