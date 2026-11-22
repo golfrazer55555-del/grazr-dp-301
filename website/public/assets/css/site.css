@@ -331,3 +331,36 @@ section { position: relative; }
   .kakao-fab span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
 @media print { .kakao-fab { display: none; } }
+
+/* ---- product page with a still hero (DP-501) */
+.hero-static { height: 100vh; height: 100svh; min-height: 560px; overflow: hidden; }
+.hero-static .hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.hero-static .hero-copy > * { opacity: 1; transform: none; }
+.limited { color: #c9a35c; letter-spacing: .24em; }
+p.small.limited { font: 500 11px/1.4 var(--en); margin: -6px 0 18px; }
+.cert { padding: clamp(64px, 9vw, 120px) 0; }
+.cert-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(28px, 5vw, 72px); align-items: center; }
+.cert-img { width: 100%; height: auto; border-radius: 10px; box-shadow: 0 20px 60px rgba(0, 0, 0, .5); }
+.feature-media img.clip { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; background: #000; }
+
+/* ---- brand home: two products */
+.brand-hero { padding: calc(var(--header) + clamp(64px, 10vw, 140px)) 0 clamp(40px, 6vw, 80px); text-align: center; background: radial-gradient(120% 80% at 50% 0%, #15151a 0%, #000 70%); }
+.brand-mark { width: clamp(96px, 12vw, 140px); height: auto; margin: 0 auto 28px; display: block; }
+.products { padding: clamp(24px, 4vw, 48px) 0 clamp(84px, 12vw, 150px); }
+.product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(20px, 3vw, 40px); }
+.product-card { display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.product-media { display: block; aspect-ratio: 4 / 5; background: #000; overflow: hidden; }
+.product-media img { width: 100%; height: 100%; object-fit: cover; transition: transform 1.2s var(--ease); }
+.product-card:hover .product-media img { transform: scale(1.03); }
+.product-copy { padding: clamp(22px, 3vw, 34px); }
+.product-copy .h3 { margin: 0 0 10px; }
+.product-copy .price { margin: 14px 0 0; }
+.product-copy .btn-row { margin-top: 22px; }
+.promise { padding: 0 0 clamp(84px, 12vw, 140px); }
+.promise-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; border-top: 1px solid var(--line); padding-top: 36px; }
+.promise-grid .eyebrow { margin-bottom: 10px; }
+@media (max-width: 900px) {
+  .product-grid, .cert-grid { grid-template-columns: 1fr; }
+  .promise-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 520px) { .promise-grid { grid-template-columns: 1fr; } }

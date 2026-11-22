@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block title %}주문하기 | GRAZR{% endblock %}
-{% block description %}GRAZR DP-301 주문하기{% endblock %}
+{% block description %}{{ product.name }} 주문하기{% endblock %}
 {% block body_class %}page-checkout{% endblock %}
 {% block nav %}{% endblock %}
-{% block header_cta %}<a class="btn btn-small btn-ghost" href="/#buy">돌아가기</a>{% endblock %}
+{% block header_cta %}<a class="btn btn-small btn-ghost" href="{{ product.page }}#buy">돌아가기</a>{% endblock %}
 {% block kakao_fab %}{% endblock %}
 {% block main %}
-<section class="checkout wrap" data-checkout data-client-key="{{ toss_client_key }}" data-price="{{ price }}">
+<section class="checkout wrap" data-checkout data-client-key="{{ toss_client_key }}" data-price="{{ product.price }}" data-product="{{ product.key }}" data-name="{{ product.name }}">
   {% if pay_mode == "test" %}
   <p class="test-banner"><strong>테스트 결제 화면</strong> 실제로 결제되거나 배송되지 않습니다. 구매는 <a href="{{ store_url }}" target="_blank" rel="noopener">네이버 스마트스토어</a>에서 해 주세요.</p>
   {% endif %}
@@ -16,18 +16,18 @@
       <fieldset class="co-box">
         <legend>상품</legend>
         <div class="co-product">
-          {% for o in options %}<img class="co-thumb{% if loop.first %} is-on{% endif %}" data-buy-img="{{ o.key }}" src="/media/product/{{ o.img }}-640.webp" alt="" width="96" height="120">{% endfor %}
+          {% for o in product.options %}<img class="co-thumb{% if loop.first %} is-on{% endif %}" data-buy-img="{{ o.key }}" src="{{ o.img }}" alt="" width="96" height="120">{% endfor %}
           <div>
-            <p class="co-name">GRAZR DP-301 퍼터</p>
-            <p class="small muted">헤드커버 포함 · 오른손용 · 배송비 무료</p>
-            <p class="co-price">{{ '{:,}'.format(price) }}원</p>
+            <p class="co-name">{{ product.name }}</p>
+            <p class="small muted">{{ product.note }}</p>
+            <p class="co-price">{{ '{:,}'.format(product.price) }}원</p>
           </div>
         </div>
-        <p class="co-label">길이 · 샤프트</p>
+        <p class="co-label">{{ '길이 · 샤프트' if product.options|length > 1 else '옵션' }}</p>
         <div class="chips">
-          {% for o in options %}
-          <label class="chip"><input type="radio" name="shaft" value="{{ o.key }}" data-shaft-input data-label="{{ o.inch }}인치 {{ '블랙' if o.key == 'black' else '실버' }}"{% if loop.first %} checked{% endif %}>
-            <span><i class="swatch swatch-{{ o.key }}" aria-hidden="true"></i>{{ t.opt_long[o.key] }}</span></label>
+          {% for o in product.options %}
+          <label class="chip"><input type="radio" name="shaft" value="{{ o.key }}" data-shaft-input data-label="{{ o.label }}"{% if loop.first %} checked{% endif %}>
+            <span>{% if product.options|length > 1 %}<i class="swatch swatch-{{ o.key }}" aria-hidden="true"></i>{% endif %}{{ o.long }}</span></label>
           {% endfor %}
         </div>
         <label class="co-field co-qty">수량
@@ -61,10 +61,10 @@
 
     <aside class="co-summary">
       <dl class="kv">
-        <div><dt>상품 금액</dt><dd data-total>{{ '{:,}'.format(price) }}원</dd></div>
+        <div><dt>상품 금액</dt><dd data-total>{{ '{:,}'.format(product.price) }}원</dd></div>
         <div><dt>배송비</dt><dd>무료</dd></div>
       </dl>
-      <p class="co-sum">결제 금액 <strong data-total>{{ '{:,}'.format(price) }}원</strong></p>
+      <p class="co-sum">결제 금액 <strong data-total>{{ '{:,}'.format(product.price) }}원</strong></p>
       <label class="co-agree"><input type="checkbox" name="agree" form="none" data-agree>
         <span>주문 내용을 확인했으며, <a href="/terms/" target="_blank">이용약관</a>과 배송을 위한 <a href="/privacy/" target="_blank">개인정보 수집·이용</a>(이름, 연락처, 이메일, 주소 · 5년 보관)에 동의합니다.</span></label>
       <button class="btn btn-primary btn-block" type="button" data-pay disabled>결제하기</button>

@@ -117,13 +117,24 @@ def build_fonts(text):
     return preload
 
 
-def jsonld():
+def jsonld(key=None):
+    """Product (+ Organization) structured data. key=None: organization only (home page)."""
+    org = {"@context": "https://schema.org", "@type": "Organization", "name": "GRAZR", "alternateName": "그레이저",
+           "sameAs": [C.INSTAGRAM_URL, C.YOUTUBE_URL, C.KAKAO_URL]}
+    if C.SITE_URL:
+        org["url"] = C.SITE_URL + "/"
+        org["logo"] = C.SITE_URL + "/assets/img/logo-stacked.png"
+    if key is None:
+        return json.dumps([org], ensure_ascii=False)
+    p = C.PRODUCTS[key]
+    desc = C.KO["description"] if key == "dp-301" else C.P501["description"]
+    images = ["/media/og.jpg", "/media/product/full-black.webp"] if key == "dp-301" else ["/media/dp501/og.jpg", "/media/dp501/full.webp"]
     data = {
-        "@context": "https://schema.org", "@type": "Product", "name": "GRAZR DP-301 퍼터",
-        "brand": {"@type": "Brand", "name": "GRAZR"}, "model": "DP-301", "description": C.KO["description"],
-        "offers": {"@type": "Offer", "priceCurrency": "KRW", "price": str(C.PRICE_KRW),
+        "@context": "https://schema.org", "@type": "Product", "name": p["name"],
+        "brand": {"@type": "Brand", "name": "GRAZR"}, "model": key.upper(), "description": desc,
+        "offers": {"@type": "Offer", "priceCurrency": "KRW", "price": str(p["price"]),
                    "availability": "https://schema.org/InStock", "itemCondition": "https://schema.org/NewCondition",
-                   "url": C.STORE_URL,
+                   "url": (C.SITE_URL + p["page"]) if C.SITE_URL else p["store"],
                    # same terms as content.SHIPPING: free shipping in Korea, dispatched within 1 day
                    "shippingDetails": {
                        "@type": "OfferShippingDetails",
@@ -148,13 +159,8 @@ def jsonld():
                    }},
     }
     if C.SITE_URL:
-        data["image"] = [C.SITE_URL + "/media/og.jpg", C.SITE_URL + "/media/product/full-black.webp"]
-        data["url"] = C.SITE_URL + "/"
-    org = {"@context": "https://schema.org", "@type": "Organization", "name": "GRAZR", "alternateName": "그레이저",
-           "sameAs": [C.INSTAGRAM_URL, C.YOUTUBE_URL, C.KAKAO_URL]}
-    if C.SITE_URL:
-        org["url"] = C.SITE_URL + "/"
-        org["logo"] = C.SITE_URL + "/assets/img/logo-stacked.png"
+        data["image"] = [C.SITE_URL + i for i in images]
+        data["url"] = C.SITE_URL + p["page"]
     return json.dumps([data, org], ensure_ascii=False)
 
 
@@ -165,18 +171,30 @@ def main():
     common = dict(site_url=C.SITE_URL, store_url=C.STORE_URL, youtube_url=C.YOUTUBE_URL, kakao_url=C.KAKAO_URL, instagram_url=C.INSTAGRAM_URL, kakao_chat_url=C.KAKAO_CHAT_URL, biz=C.BUSINESS,
                   options=C.OPTIONS, shipping=C.SHIPPING, notice=C.NOTICE, direct_pay=C.DIRECT_PAY,
                   hero_frames=hero_frames, year=datetime.date.today().year, fill=fill,
-                  price=C.PRICE_KRW, pay_mode=C.PAY_MODE, toss_client_key=C.TOSS_CLIENT_KEY)
+                  price=C.PRICE_KRW, pay_mode=C.PAY_MODE, toss_client_key=C.TOSS_CLIENT_KEY, products=C.PRODUCTS)
 
     def render_all(preload, v):
         pages = []
-        for t, path, rel, extra in (
-            (C.KO, "/", "index.html", {"jsonld": jsonld()}),
+        if C.SHOW_DP501:
+            product_pages = (
+                (C.KO, "/", "index.html", {"tpl": "home.html", "jsonld": jsonld()}),
+                (C.KO, "/dp-301/", "dp-301/index.html", {"tpl": "index.html", "jsonld": jsonld("dp-301")}),
+                (C.KO, "/dp-501/", "dp-501/index.html",
+                 {"tpl": "dp501.html", "jsonld": jsonld("dp-501"), "p": C.P501, "notice": C.NOTICE_501,
+                  "product": C.PRODUCTS["dp-501"], "store_url": C.STORE_URL_501}),
+                (C.KO, "/checkout/dp-501/", "checkout/dp-501/index.html",
+                 {"tpl": "checkout.html", "noindex": True, "product": C.PRODUCTS["dp-501"]}),
+            )
+        else:
+            product_pages = ((C.KO, "/", "index.html", {"tpl": "index.html", "jsonld": jsonld("dp-301")}),)
+        for t, path, rel, extra in product_pages + (
             (C.EN, "/en/", "en/index.html", {}),
             (C.KO, "/terms/", "terms/index.html", {"page_title": L.TERMS_TITLE, "intro": L.TERMS_INTRO, "sections": L.TERMS}),
             (C.KO, "/privacy/", "privacy/index.html",
              {"page_title": L.PRIVACY_TITLE, "intro": L.PRIVACY_INTRO, "sections": L.PRIVACY}),
             (C.KO, "/404", "404.html", {}),
-            (C.KO, "/checkout/", "checkout/index.html", {"tpl": "checkout.html", "noindex": True}),
+            (C.KO, "/checkout/", "checkout/index.html",
+             {"tpl": "checkout.html", "noindex": True, "product": C.PRODUCTS["dp-301"]}),
             (C.KO, "/checkout/success/", "checkout/success/index.html",
              {"tpl": "checkout_result.html", "noindex": True, "result": "success"}),
             (C.KO, "/checkout/fail/", "checkout/fail/index.html",
@@ -211,7 +229,7 @@ def main():
     robots = "User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /checkout/\n"
     if C.SITE_URL:
         robots += "Sitemap: %s/sitemap.xml\n" % C.SITE_URL
-        urls = "".join("<url><loc>%s%s</loc></url>" % (C.SITE_URL, p) for p in ("/", "/en/", "/terms/", "/privacy/"))
+        urls = "".join("<url><loc>%s%s</loc></url>" % (C.SITE_URL, p) for p in (("/", "/dp-301/", "/dp-501/") if C.SHOW_DP501 else ("/",)) + ("/en/", "/terms/", "/privacy/"))
         write("sitemap.xml", '<?xml version="1.0" encoding="UTF-8"?>\n'
               '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">%s</urlset>\n' % urls)
     write("robots.txt", robots)

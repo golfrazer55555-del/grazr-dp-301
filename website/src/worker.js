@@ -10,6 +10,14 @@ const TOSS = "https://api.tosspayments.com/v1/payments";
 const COURIERS = { logen: "로젠택배", cj: "CJ대한통운", hanjin: "한진택배", lotte: "롯데택배", post: "우체국택배", etc: "기타" };
 const KEEP_MS = 5 * 365 * 24 * 3600e3;   // 전자상거래법: 대금 결제·공급 기록 5년
 const SESSION_S = 30 * 24 * 3600;
+// products sold on the site; the server, not the browser, decides each price
+const DEFAULT_PRODUCTS = {
+  "dp-301": { name: "GRAZR DP-301 퍼터", price: 385000 },
+  "dp-501": { name: "GRAZR DP-501 파크골프채", price: 462000 },
+};
+function products(env) {
+  try { return env.PRODUCTS ? JSON.parse(env.PRODUCTS) : DEFAULT_PRODUCTS; } catch { return DEFAULT_PRODUCTS; }
+}
 
 const json = (body, status = 200, headers = {}) =>
   new Response(JSON.stringify(body), {
@@ -112,7 +120,7 @@ function orderMail(env, d, ship, isTest) {
     "",
     "[주문]",
     "주문번호: " + d.orderId,
-    "상품: " + d.orderName,
+    "상품: " + (ship.productName || d.orderName),
     "옵션: " + (ship.option || "-") + " / 수량 " + (ship.qty || "-") + "개",
     "결제 금액: " + won(d.totalAmount),
     "결제 수단: " + (d.method || "-"),
@@ -131,7 +139,8 @@ function orderMail(env, d, ship, isTest) {
     "",
     "결제 후 1일 이내 발송 · 로젠택배",
   ].filter((l, i) => i > 0 || l);
-  const subject = (isTest ? "[테스트] " : "") + "[GRAZR 주문] " + (ship.name || "") + " · " + d.orderName + " · " + won(d.totalAmount);
+  const subject = (isTest ? "[테스트] " : "") + "[GRAZR 주문] " + (ship.name || "") + " · " + (ship.productName || d.orderName) +
+    " · " + won(d.totalAmount);
   const raw = [
     "From: " + word("GRAZR 주문 알림") + " <" + from + ">",
     "To: <" + to + ">",
@@ -175,7 +184,11 @@ async function confirm(request, env, ctx) {
   try { body = await request.json(); } catch { return json({ code: "BAD_REQUEST", message: "잘못된 요청입니다." }, 400); }
   const { paymentKey, orderId } = body || {};
   const amount = Number(body && body.amount);
-  const price = Number(env.PRICE_KRW || 385000);
+  const catalog = products(env);
+  const wanted = body?.product || body?.shipping?.product;
+  const productKey = typeof wanted === "string" && catalog[wanted] ? wanted : "dp-301";
+  const product = catalog[productKey];
+  const price = Number(product.price);
   const maxQty = Number(env.MAX_QTY || 3);
   if (typeof paymentKey !== "string" || paymentKey.length > 200 || typeof orderId !== "string" || !/^[A-Za-z0-9_-]{6,64}$/.test(orderId))
     return json({ code: "BAD_REQUEST", message: "잘못된 주문 정보입니다." }, 400);
@@ -200,6 +213,7 @@ async function confirm(request, env, ctx) {
     name: clip(s.name, 40), phone: clip(s.phone, 20), email: clip(s.email, 100),
     address: clip(s.address || meta.address, 300), memo: clip(s.memo || meta.memo, 100),
     option: clip(meta.option || s.option, 40), qty: String(Math.round(d.totalAmount / price)),
+    product: productKey, productName: product.name,
   };
   const after = [];
   if (env.ORDERS) {

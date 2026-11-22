@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}{{ p.title }}{% endblock %}
+{% block description %}{{ p.description }}{% endblock %}
+{% block head %}{% if jsonld %}<script type="application/ld+json">{{ jsonld|safe }}</script>{% endif %}{% endblock %}
+{% block body_class %}page-product page-501{% endblock %}
+{% block nav %}
+<nav class="nav" aria-label="주요 메뉴">
+  <a href="/">홈</a>{% for label, href in p.nav %}<a href="{{ href }}">{{ label }}</a>{% endfor %}
+</nav>
+{% endblock %}
+{% block lang %}{% endblock %}
+{% block header_cta %}<a class="btn btn-small" href="#buy">구매하기</a>{% endblock %}
+{% block main %}
+<section class="hero hero-static" aria-label="GRAZR DP-501">
+  <picture>
+    <source media="(max-width: 720px)" srcset="/media/dp501/hero-m.webp">
+    <img class="hero-img" src="/media/dp501/hero.webp" alt="GRAZR DP-501 파크골프채 헤드" width="1920" height="1080" fetchpriority="high">
+  </picture>
+  <div class="hero-shade" aria-hidden="true"></div>
+  <div class="wrap hero-copy">
+    <p class="eyebrow">{{ p.hero_eyebrow }}</p>
+    <h1 class="display">{{ p.hero_title|safe }}</h1>
+    <p class="hero-sub">{{ p.hero_sub }}</p>
+    <div class="btn-row">
+      {% for label, href, kind in p.hero_buttons %}<a class="btn btn-{{ kind }}" href="{{ href }}">{{ label }}</a>{% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="intro" id="intro">
+  <div class="wrap narrow" data-reveal>
+    <p class="eyebrow limited">{{ p.limited }}</p>
+    <h2 class="h2">{{ p.intro_title }}</h2>
+    <p class="lead">{{ p.intro_text }}</p>
+  </div>
+</section>
+
+<section class="features" id="features">
+  <div class="wrap">
+    {% for f in p.features %}
+    <article class="feature{% if loop.index is even %} flip{% endif %}" id="f-{{ f.id }}">
+      <div class="feature-media" data-reveal>
+        <img class="clip" src="/media/dp501/f-{{ f.id }}.webp" alt="{{ f.title }}" loading="lazy" width="1280" height="960">
+      </div>
+      <div class="feature-copy" data-reveal>
+        <p class="num">{{ '%02d' % loop.index }}</p>
+        <p class="eyebrow">{{ f.en }}</p>
+        <h3 class="h3">{{ f.title }}</h3>
+        <p class="body">{{ f.text }}</p>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="cert" id="cert">
+  <div class="wrap cert-grid" data-reveal>
+    <img class="cert-img" src="/media/dp501/cert.webp" alt="(사)대한파크골프협회 공인인증 스티커" loading="lazy" width="800" height="618">
+    <div>
+      <p class="eyebrow">{{ p.cert_eyebrow }}</p>
+      <h2 class="h2">{{ p.cert_title }}</h2>
+      <p class="body">{{ p.cert_text }}</p>
+    </div>
+  </div>
+</section>
+
+<section class="view3d" id="view3d">
+  <div class="wrap">
+    <header class="section-head" data-reveal>
+      <p class="eyebrow">{{ t.v3d_eyebrow }}</p>
+      <h2 class="h2">{{ p.v3d_title }}</h2>
+      <p class="body">{{ t.v3d_text }}</p>
+    </header>
+    <div class="viewer" data-viewer data-src="/media/3d/dp501.glb" data-alt="GRAZR DP-501 3D" data-ar="{{ t.v3d_ar }}">
+      <img class="viewer-poster" src="/media/dp501/poster.webp" alt="" loading="lazy" width="1280" height="720">
+      <div class="viewer-cta">
+        <button class="btn btn-primary" type="button" data-viewer-load data-loading="{{ t.v3d_loading }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5zm0 2.3L18.6 8 12 11.7 5.4 8 12 4.3zM5 9.7l6 3.4v6.6l-6-3.4V9.7zm8 10V13.1l6-3.4v6.6l-6 3.4z"/></svg>
+          <span>{{ t.v3d_load }}</span>
+        </button>
+        <p class="hint">{{ p.v3d_hint }}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="photos" id="photos">
+  <div class="wrap">
+    <header class="section-head" data-reveal>
+      <p class="eyebrow">{{ t.photos_eyebrow }}</p>
+      <h2 class="h2">{{ t.photos_title }}</h2>
+      <p class="body">{{ t.photos_text }}</p>
+    </header>
+    <div class="photo-grid">
+      {% for key, cap in p.photos %}
+      <figure data-reveal>
+        <button type="button" class="photo" data-photo="/media/dp501/photos/{{ key }}.webp" aria-label="{{ cap }}">
+          <img src="/media/dp501/photos/{{ key }}-640.webp" srcset="/media/dp501/photos/{{ key }}-640.webp 640w, /media/dp501/photos/{{ key }}.webp 1400w"
+               sizes="(max-width: 720px) 50vw, 33vw" alt="{{ cap }}" loading="lazy">
+        </button>
+        <figcaption>{{ cap }}</figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+  </div>
+  <dialog class="lightbox" data-lightbox>
+    <form method="dialog"><button class="lightbox-close" aria-label="닫기">×</button></form>
+    <img alt="">
+  </dialog>
+</section>
+
+<section class="specs" id="specs">
+  <div class="wrap">
+    <header class="section-head" data-reveal>
+      <p class="eyebrow">{{ t.specs_eyebrow }}</p>
+      <h2 class="h2">{{ t.specs_title }}</h2>
+    </header>
+    <dl class="spec-list" data-reveal>
+      {% for k, v in p.specs %}<div><dt>{{ k }}</dt><dd>{{ v }}</dd></div>{% endfor %}
+    </dl>
+  </div>
+</section>
+
+<section class="buy" id="buy">
+  <div class="wrap buy-grid">
+    <div class="buy-media">
+      <img class="buy-img is-on" src="/media/dp501/full.webp" alt="GRAZR DP-501" loading="lazy" width="1200" height="1500">
+    </div>
+    <div class="buy-panel">
+      <p class="eyebrow">{{ t.buy_eyebrow }}</p>
+      <h2 class="h2">{{ product.name }}</h2>
+      <p class="price">{{ p.price }}</p>
+      <p class="small limited">{{ p.limited }}</p>
+      <fieldset class="options">
+        <legend>옵션</legend>
+        <div class="chips"><label class="chip chip-lg"><input type="radio" name="opt-buy" checked><span>{{ p.buy_option }}</span></label></div>
+      </fieldset>
+      <p class="small">{{ p.buy_includes }}</p>
+      {% if direct_pay %}
+      <a class="btn btn-primary btn-block" href="/checkout/dp-501/">{{ t.buy_direct }}</a>
+      <p class="small muted">{{ t.buy_direct_note }}</p>
+      <a class="btn btn-ghost btn-block" href="{{ store_url }}" target="_blank" rel="noopener">
+        <span>{{ t.buy_store }}</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7h-2V6.4l-9.3 9.3-1.4-1.4L17.6 5H14V3zM5 5h6v2H7v10h10v-4h2v6H5V5z"/></svg>
+      </a>
+      {% else %}
+      <a class="btn btn-primary btn-block" href="{{ store_url }}" target="_blank" rel="noopener"><span>{{ t.buy_store }}</span></a>
+      {% endif %}
+      <p class="small muted">{{ t.buy_note }}</p>
+      <a class="btn btn-kakao btn-block" href="{{ kakao_chat_url }}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c-5.25 0-9.5 3.33-9.5 7.44 0 2.66 1.78 4.99 4.46 6.3l-.9 3.3c-.08.29.25.52.5.35l3.95-2.62c.49.07.99.1 1.49.1 5.25 0 9.5-3.33 9.5-7.43S17.25 3.5 12 3.5z"/></svg><span>{{ t.kakao_ask }}</span></a>
+      <details class="fold">
+        <summary>배송 · 교환 · 반품 안내</summary>
+        <dl class="kv">
+          <div><dt>배송비</dt><dd>{{ shipping.fee }}</dd></div>
+          <div><dt>택배사</dt><dd>{{ shipping.courier }}</dd></div>
+          <div><dt>발송</dt><dd>{{ shipping.dispatch }}</dd></div>
+          <div><dt>교환·반품 신청</dt><dd>상품을 받은 날부터 7일 이내</dd></div>
+          <div><dt>반품 배송비</dt><dd>단순 변심 시 {{ shipping.return_fee }}</dd></div>
+          <div><dt>교환 배송비</dt><dd>{{ shipping.exchange_fee }}</dd></div>
+          <div><dt>상품 하자·오배송</dt><dd>판매자가 배송비를 부담합니다</dd></div>
+          <div><dt>보내실 곳</dt><dd>{{ shipping.return_address }}</dd></div>
+          <div><dt>A/S 문의</dt><dd><a href="tel:{{ shipping.as_phone }}">{{ shipping.as_phone }}</a></dd></div>
+        </dl>
+      </details>
+      <details class="fold">
+        <summary>상품정보 제공고시</summary>
+        <dl class="kv">
+          {% for k, v in notice %}<div><dt>{{ k }}</dt><dd>{{ val(v) }}</dd></div>{% endfor %}
+        </dl>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="faq" id="faq">
+  <div class="wrap narrow">
+    <header class="section-head" data-reveal>
+      <p class="eyebrow">{{ t.faq_eyebrow }}</p>
+      <h2 class="h2">{{ t.faq_title }}</h2>
+    </header>
+    <div class="faq-list">
+      {% for q, a in p.faq %}
+      <details class="fold"><summary>{{ q }}</summary><p>{{ a }}</p></details>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}<script src="/assets/js/site.js?v={{ v.js }}" defer></script>{% endblock %}

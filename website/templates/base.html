@@ -45,7 +45,7 @@
     </nav>
     {% endblock %}
     <div class="header-actions">
-      <a class="lang" href="{{ t.lang_switch[1] }}" hreflang="{{ 'en' if t.lang == 'ko' else 'ko' }}">{{ t.lang_switch[0] }}</a>
+      {% block lang %}<a class="lang" href="{{ t.lang_switch[1] }}" hreflang="{{ 'en' if t.lang == 'ko' else 'ko' }}">{{ t.lang_switch[0] }}</a>{% endblock %}
       {% block header_cta %}<a class="btn btn-small" href="{{ t.nav_cta[1] }}">{{ t.nav_cta[0] }}</a>{% endblock %}
     </div>
   </div>

@@ -33,7 +33,7 @@
     return "https://search.naver.com/search.naver?query=" + encodeURIComponent(courierName(o.courier) + " " + o.tracking);
   }
   function message(o) {
-    return "[GRAZR] " + (o.name || "고객") + "님, 주문하신 " + (o.orderName || "GRAZR DP-301 퍼터") +
+    return "[GRAZR] " + (o.name || "고객") + "님, 주문하신 " + (o.productName || o.orderName || "GRAZR 제품") +
       (o.option ? " (" + o.option + ")" : "") + "를 발송했습니다.\n" +
       courierName(o.courier) + " 송장번호: " + o.tracking + "\n" +
       "배송 조회: " + trackUrl(o) + "\n" +
@@ -144,7 +144,7 @@
     var st = f("status"); st.textContent = STATUS[o.status] || o.status; st.className = "pill " + o.status;
     f("name").textContent = o.name || "(이름 없음)";
     if (o.test) { var t = document.createElement("span"); t.className = "tag-test"; t.textContent = "테스트"; f("name").appendChild(t); }
-    f("what").textContent = (o.option || "") + " × " + (o.qty || 1);
+    f("what").textContent = (o.productName || "GRAZR DP-301 퍼터").replace(/^GRAZR /, "") + " · " + (o.option || "") + " × " + (o.qty || 1);
     f("amount").textContent = won(o.amount);
     f("name2").textContent = o.name || "";
     var ph = f("phone"); ph.textContent = phone(o.phone); ph.href = "tel:" + String(o.phone || "").replace(/[^0-9]/g, "");

@@ -10,6 +10,7 @@ INSTAGRAM_URL = "https://www.instagram.com/grazr.official/"
 KAKAO_URL = "https://pf.kakao.com/_DFdvX"            # 카카오톡 채널 홈
 KAKAO_CHAT_URL = "https://pf.kakao.com/_DFdvX/chat"  # 1:1 채팅 바로 열기
 PRICE_KRW = 385000
+SHOW_DP501 = False         # two-product site (home + /dp-301/ + /dp-501/); off until the DP-501 page is finished
 DIRECT_PAY = True          # show the "사이트에서 바로 결제" button on the home page (after Toss approval)
 # Toss Payments (결제위젯). "test" = no real charge; switch to "live" with the live client key after approval
 # and set the live secret key as the Cloudflare secret TOSS_SECRET_KEY (never in this file).
@@ -170,7 +171,7 @@ KO = {
         ("공은 어떻게 집나요?",
          "헤드 가운데 컷아웃을 공 위에 대고 살짝 누르면 공이 끼워집니다. 그대로 들어 올리면 됩니다."),
         ("어디서 살 수 있나요?",
-         "지금은 네이버 스마트스토어에서 구매하실 수 있습니다. 사이트 결제는 준비 중입니다."),
+         "이 페이지에서 바로 결제하시거나 네이버 스마트스토어에서 구매하실 수 있습니다. 가격과 배송·교환 조건은 같습니다."),
         ("배송은 얼마나 걸리나요?", "배송비는 무료이며, 로젠택배로 결제 후 1일 이내에 발송합니다."),
         ("교환·반품은 어떻게 하나요?",
          "상품을 받은 날부터 7일 이내에 신청하실 수 있습니다. 단순 변심일 때 반품 배송비는 편도 8,000원"
@@ -196,7 +197,7 @@ EN = {
                    "a center shaft, a head that stands on its own and a cutout that picks up the ball.",
     "nav": [("Features", "#features"), ("3D", "#view3d"), ("Specs", "#specs")],
     "nav_cta": ("Watch film", "#film"),
-    "lang_switch": ("한국어", "/"),
+    "lang_switch": ("한국어", "/dp-301/" if SHOW_DP501 else "/"),
     "hero_eyebrow": "GRAZR DP-301",
     "hero_title": "PRECISION <br class=\"br-m\">YOU CAN SEE",
     "hero_sub": "Milled from end to end",
@@ -295,4 +296,114 @@ EN = {
     "instagram": "Instagram",
     "kakao_chat": "Chat on KakaoTalk",
     "kakao_ask": "Questions? Chat with us on KakaoTalk",
+}
+
+# ================================================================ DP-501 park golf club
+STORE_URL_501 = "https://naver.me/FlBXUTu6"
+PRICE_501 = 462000
+NOTICE_501 = [
+    ("품명 / 모델명", "파크골프채 / GRAZR DP-501"),
+    ("KC 인증정보", "해당 없음"),
+    ("크기", "길이 85cm, 헤드 가로 106mm × 세로 95mm × 높이 56mm"),
+    ("중량", "530g 내외"),
+    ("색상", "블랙 · 골드"),
+    ("재질", "헤드 단풍나무(메이플) 원목 · 황동 · 카본 페이스, 샤프트 카본, 그립 고무"),
+    ("제품 구성", "파크골프채, 전용 헤드커버"),
+    ("동일 모델의 출시연월", None),
+    ("제조자", "아이엔골프 (OEM 생산)"),
+    ("수입자", "지브이투어"),
+    ("제조국", "중국"),
+    ("품질보증기준", "관련 법령 및 소비자분쟁해결기준(공정거래위원회 고시)에 따릅니다."),
+    ("A/S 책임자와 전화번호", "053-962-5531"),
+]
+P501 = {
+    "key": "dp-501",
+    "title": "GRAZR DP-501 파크골프채 | 300개 한정 프리미엄 메이플",
+    "description": "최고급 단풍나무 원목 헤드에 후면 황동추, 풀 카본 페이스. (사)대한파크골프협회 공인인증 클럽 "
+                   "GRAZR DP-501, 300개 한정판.",
+    "nav": [("특징", "#features"), ("3D", "#view3d"), ("사양", "#specs"), ("구매", "#buy")],
+    "hero_eyebrow": "GRAZR DP-501 · PARK GOLF",
+    "hero_title": "PREMIUM <br class=\"br-m\">MAPLE TREE",
+    "hero_sub": "300개 한정 프리미엄 파크골프채",
+    "hero_buttons": [("구매하기", "#buy", "primary"), ("특징 보기", "#features", "ghost")],
+    "limited": "PARKER 300 UNIT LIMITED EDITION",
+    "intro_title": "부드러운 타구감, 더 쉽게 더 정교하게",
+    "intro_text": "최고급 단풍나무 원목 헤드에 황동추와 풀 카본 페이스를 더했습니다. 협회 규정 안에서 헤드와 샤프트를 "
+                  "가장 크고 두껍게 만들어, 초보자부터 중·상급자, 선수용까지 편하게 칠 수 있습니다.",
+    "features": [
+        {"id": "brass", "en": "REAR BRASS WEIGHT", "title": "후면 황동추, 낮고 깊은 무게중심",
+         "text": "헤드 뒤쪽에 황동 무게추를 달아 무게중심을 뒤로 옮겼습니다. 공을 쉽게 띄우고 멀리 보내며, "
+                 "빗맞았을 때 손에 전해지는 진동을 줄여 줍니다."},
+        {"id": "maple", "en": "MAXIMUM MAPLE HEAD", "title": "공인 허용치 최대 크기의 메이플 헤드",
+         "text": "협회 규정 안에서 헤드를 가장 크게 키워 스윗스팟을 넓혔습니다. 미스샷 부담이 줄어 초보자부터 상급자까지 편하게 칩니다."},
+        {"id": "shaft", "en": "HIGH-MODULUS CARBON SHAFT", "title": "공인 허용치 최대 두께의 카본 샤프트",
+         "text": "일반 클럽보다 두껍고 탄성이 좋은 고탄성 카본 샤프트입니다. 스윙할 때 뒤틀림을 억제하고 내구성과 비거리를 높였습니다."},
+        {"id": "aim", "en": "MAPLE AIMING LINE", "title": "단풍나무 조준 라인",
+         "text": "헤드 윗면과 샤프트에 정렬 라인을 넣었습니다. 어드레스할 때 목표 방향으로 정확하게 맞출 수 있습니다."},
+    ],
+    "cert_eyebrow": "CERTIFIED",
+    "cert_title": "(사)대한파크골프협회 공인인증 클럽",
+    "cert_text": "대회에서도 그대로 쓸 수 있는 공인 클럽입니다. 클럽에 협회 공인인증 스티커가 붙어 있습니다.",
+    "v3d_title": "직접 돌려 보세요",
+    "v3d_hint": "3D 모델은 약 4MB입니다. 버튼을 누르면 불러옵니다.",
+    "photos": [
+        ("face", "풀 카본 페이스와 황동 핀"),
+        ("top", "윗면 조준 그래픽"),
+        ("sole", "황동 바닥 각인"),
+        ("back", "후면 황동 무게추"),
+        ("toe", "PARKER 300 UNIT LIMITED EDITION"),
+        ("heel", "GRAZR GOLF RAZER"),
+        ("shaft", "카본 샤프트 그래픽"),
+        ("grip", "미끄럼 방지 고무 그립"),
+        ("cover", "전용 헤드커버"),
+    ],
+    "specs": [
+        ("모델", "GRAZR DP-501"),
+        ("종류", "파크골프채 · 말렛형 헤드"),
+        ("헤드", "최고급 단풍나무(메이플) 원목 + 후면 황동추"),
+        ("페이스", "풀 카본"),
+        ("바닥", "황동 (각인)"),
+        ("헤드 크기", "가로 106mm × 세로 95mm × 높이 56mm"),
+        ("샤프트", "고탄성 카본 (공인 규정 허용치 내 최대 두께)"),
+        ("그립", "미끄럼 방지 고무 그립"),
+        ("길이", "85cm"),
+        ("총 무게", "530g 내외"),
+        ("방향", "오른손용"),
+        ("공인", "(사)대한파크골프협회 공인인증"),
+        ("수량", "300개 한정 (PARKER 300 UNIT LIMITED EDITION)"),
+        ("구성", "파크골프채, 전용 고급 헤드커버"),
+        ("제조사", "아이엔골프 (OEM 생산)"),
+        ("수입자", "지브이투어"),
+        ("제조국", "중국"),
+    ],
+    "price": "462,000원",
+    "buy_option": "85cm · 오른손용",
+    "buy_includes": "구성: 파크골프채 + 전용 고급 헤드커버 · 오른손용",
+    "faq": [
+        ("대회에서 쓸 수 있나요?", "네, (사)대한파크골프협회 공인인증 클럽입니다. 클럽에 공인인증 스티커가 붙어 있습니다."),
+        ("길이와 무게는 어떻게 되나요?", "길이 85cm, 총 무게 530g 내외입니다. 길이는 한 가지입니다."),
+        ("왼손잡이용이 있나요?", "현재는 오른손용만 있습니다."),
+        ("정말 300개만 판매하나요?", "네, 300개 한정판입니다. 헤드 옆면에 PARKER 300 UNIT LIMITED EDITION이 새겨져 있습니다."),
+        ("헤드커버가 함께 오나요?", "네, 전용 고급 헤드커버가 함께 들어 있습니다."),
+        ("어디서 살 수 있나요?",
+         "이 페이지에서 바로 결제하시거나 네이버 스마트스토어에서 구매하실 수 있습니다. 가격과 배송·교환 조건은 같습니다."),
+        ("배송은 얼마나 걸리나요?", "배송비는 무료이며, 로젠택배로 결제 후 1일 이내에 발송합니다."),
+        ("교환·반품은 어떻게 하나요?",
+         "상품을 받은 날부터 7일 이내에 신청하실 수 있습니다. 단순 변심일 때 반품 배송비는 편도 8,000원"
+         "(처음 배송비가 무료였던 경우 16,000원), 교환 배송비는 16,000원입니다. 상품 하자나 오배송은 판매자가 배송비를 부담합니다. "
+         "자세한 기준은 이용약관을 확인해 주세요."),
+    ],
+}
+
+# products sold on the site (checkout, admin, mail). Prices must match PRODUCTS in wrangler.jsonc.
+PRODUCTS = {
+    "dp-301": {"key": "dp-301", "name": "GRAZR DP-301 퍼터", "short": "DP-301 퍼터", "price": PRICE_KRW,
+               "page": "/dp-301/" if SHOW_DP501 else "/", "store": STORE_URL, "note": "헤드커버 포함 · 오른손용 · 배송비 무료",
+               "options": [{"key": o["key"], "label": f"{o['inch']}인치 {'블랙' if o['key'] == 'black' else '실버'}",
+                            "long": f"{o['inch']}인치 · {'블랙' if o['key'] == 'black' else '실버'} 샤프트",
+                            "img": f"/media/product/{o['img']}-640.webp"} for o in OPTIONS]},
+    "dp-501": {"key": "dp-501", "name": "GRAZR DP-501 파크골프채", "short": "DP-501 파크골프채", "price": PRICE_501,
+               "page": "/dp-501/", "store": STORE_URL_501, "note": "300개 한정 · 헤드커버 포함 · 오른손용 · 배송비 무료",
+               "options": [{"key": "std", "label": "85cm 오른손용", "long": "85cm · 오른손용",
+                            "img": "/media/dp501/thumb-640.webp"}]},
 }

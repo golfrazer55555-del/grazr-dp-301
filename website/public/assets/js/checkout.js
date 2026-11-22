@@ -12,6 +12,8 @@
 
   function initCheckout(box) {
     var price = parseInt(box.getAttribute("data-price"), 10);
+    var product = box.getAttribute("data-product") || "dp-301";
+    var productName = box.getAttribute("data-name") || "GRAZR DP-301";
     var form = box.querySelector("[data-co-form]");
     var errEl = box.querySelector("[data-co-error]");
     var payBtn = box.querySelector("[data-pay]");
@@ -83,9 +85,9 @@
       var label = opt.getAttribute("data-label");
       var q = qty();
       var orderId = "GRAZR-" + Date.now().toString(36).toUpperCase() + "-" + Math.random().toString(36).slice(2, 8).toUpperCase();
-      var orderName = "GRAZR DP-301 " + label + (q > 1 ? " x" + q : "");
+      var orderName = productName + " " + label + (q > 1 ? " x" + q : "");
       var address = "(" + value("zip") + ") " + value("addr1") + " " + value("addr2");
-      store("grazr-order-" + orderId, { orderName: orderName, name: value("name"), address: address,
+      store("grazr-order-" + orderId, { product: product, orderName: orderName, name: value("name"), address: address,
         phone: value("phone").replace(/[^0-9]/g, ""), email: value("email"), memo: value("memo"), option: label, qty: String(q) });
       payBtn.disabled = true;
       widgets.requestPayment({
@@ -96,7 +98,7 @@
         customerName: value("name"),
         customerEmail: value("email"),
         customerMobilePhone: value("phone").replace(/[^0-9]/g, ""),
-        metadata: { option: label, qty: String(q), address: address.slice(0, 300), memo: value("memo").slice(0, 100) }
+        metadata: { product: product, option: label, qty: String(q), address: address.slice(0, 300), memo: value("memo").slice(0, 100) }
       }).catch(function (e) {
         payBtn.disabled = false;
         if (e && e.code === "USER_CANCEL") return;
@@ -113,6 +115,8 @@
       var d = document.createElement("div"), dt = document.createElement("dt"), dd = document.createElement("dd");
       dt.textContent = k; dd.textContent = v; d.appendChild(dt); d.appendChild(dd); detail.appendChild(d);
     }
+    var placed = load("grazr-order-" + (q.get("orderId") || "")) || {};
+    if (placed.product && placed.product !== "dp-301") retry.href = "/checkout/" + placed.product + "/";
     if (el.getAttribute("data-result") === "fail") {
       msg.textContent = (q.get("message") || "결제가 취소되었거나 실패했습니다.") + (q.get("code") ? " (" + q.get("code") + ")" : "");
       return;
@@ -143,7 +147,8 @@
     if (done) { show(done); return; }
     fetch("/api/confirm", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paymentKey: paymentKey, orderId: orderId, amount: Number(amount), shipping: load("grazr-order-" + orderId) || {} })
+      body: JSON.stringify({ paymentKey: paymentKey, orderId: orderId, amount: Number(amount),
+        product: (load("grazr-order-" + orderId) || {}).product, shipping: load("grazr-order-" + orderId) || {} })
     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (x) {
         if (!x.ok) throw x.j;
