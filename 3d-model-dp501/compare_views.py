@@ -71,7 +71,7 @@ def main():
         sheet("front", "front", warp(d, sx, sy, C - 523.5 * sx, C + HC[2] * PPM - 597 * sy))
     # back: reference photo (head-back.png): centre x=1018.5, sole y=1400, 12.35 px/mm; heel on the left
     d = load("head-back.png")
-    d = np.where(d.max(2, keepdims=True) > 14, 70, 255).astype(np.uint8)
+    d = np.repeat(np.where(d.max(2, keepdims=True) > 14, 70, 255), 3, axis=2).astype(np.uint8)
     s = PPM / 12.35
     sheet("back", "back", warp(d, s, s, C - 1018.5 * s, C + HC[2] * PPM - 1400 * s))
 
