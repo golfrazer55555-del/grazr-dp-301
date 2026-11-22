@@ -535,7 +535,7 @@ def brass(name, engraved=False, rough_range=(0.17, 0.25)):
         spark = node(nt, "ShaderNodeTexVoronoi", Scale=9.0)               # sand-blast grains (object mm)
         spark.feature = "F1"
         nt.links.new(coord.outputs["Object"], spark.inputs["Vector"])
-        color = mix_rgb(nt, e.outputs["Color"], BRASS, (0.96, 0.64, 0.13, 1))   # sand-blasted: deeper, more yellow gold
+        color = mix_rgb(nt, e.outputs["Color"], BRASS, (0.74, 0.46, 0.07, 1))   # sand-blasted: deeper, more yellow gold
         color = mix_rgb(nt, r_.outputs["Color"], color, (0.18, 0.12, 0.05, 1))
         color = mix_rgb(nt, k.outputs["Color"], color, (0.012, 0.012, 0.012, 1))
         sr = node(nt, "ShaderNodeMapRange", **{"To Min": 0.38, "To Max": 0.62})
