@@ -1071,7 +1071,9 @@ if SITE:
     sys.exit(0)
 
 shot("01_hero", HC + mm(-300, -340, 230), HC + mm(4, 0, 10), 85, studio())
-shot("02_face", HC + mm(0, -430, 25), HC + mm(0, 0, 4), 100, studio())
+# face: an extra broad soft box above the camera lays a sheen over the upper face, as in the face photo
+shot("02_face", HC + mm(0, -430, 25), HC + mm(0, 0, 4), 100,
+     studio() + [("sheen", HC + Vector((-0.10, -0.40, 0.30)), HC, 0.8, float(os.environ.get("SHEEN", "1.2")))])
 shot("03_top", HC + mm(0, 0, 460), HC, 85, studio(), up=(-1, 0, 0), head_only=True)
 shot("04_back", HC + mm(80, 470, 120), HC + mm(0, 0, 8), 85, studio())
 shot("05_sole", HC + mm(0, 0, -460), HC, 85, below(studio()), up=(0, -1, 0), head_only=True)
