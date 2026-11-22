@@ -1089,9 +1089,9 @@ shot("09_shaft", sc + toe_view + mm(0, -40, 0), sc, 85,
       ("fill", sc + Vector(FRONT) * 0.22 + Vector((0, 0.32, 0.0)), sc, (0.05, 0.6), 3.0),
       ("soft", sc + Vector(FRONT) * 0.45 + Vector((0, 0.0, 0.45)), sc, 0.8, 3.0)],
      up=tuple(D), res=(1200, 1600))
-gc = axis(CLUB_LEN - 175) * 0.001
-shot("10_grip", gc + Vector(FRONT) * 0.5 + mm(0, -60, 0), gc, 85,
-     [("key", gc + Vector(FRONT) * 0.4 + Vector((0, -0.3, 0.2)), gc, 0.5, 9.0),
-      ("fill", gc + Vector(FRONT) * 0.3 + Vector((0, 0.35, -0.05)), gc, 0.6, 4.0)],
-     up=tuple(D), res=(1200, 1600))
+gc = axis(CLUB_LEN - 160) * 0.001                  # whole grip from the cap (star, round logo) to the GRAZR label
+shot("10_grip", gc + Vector(FRONT) * 0.74 + mm(0, -90, 0), gc, 85,
+     [("key", gc + Vector(FRONT) * 0.5 + Vector((0, -0.35, 0.25)), gc, 0.6, 12.0),
+      ("fill", gc + Vector(FRONT) * 0.4 + Vector((0, 0.4, -0.05)), gc, 0.7, 5.0)],
+     up=tuple(D), res=(900, 1800))
 print("done")
