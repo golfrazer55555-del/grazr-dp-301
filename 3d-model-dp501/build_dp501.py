@@ -935,9 +935,16 @@ def studio_world(stops=WORLD_STOPS):
     nt.links.new(mr.outputs["Result"], ramp.inputs["Fac"])
     nt.links.new(ramp.outputs["Color"], bg.inputs["Color"])
     bg.inputs["Strength"].default_value = 1.0
+    return ramp
 
 
-studio_world()
+def world_floor(v):
+    """Brightness of the dome's floor (the two lowest stops)."""
+    for e in sorted(WORLD_RAMP.color_ramp.elements, key=lambda e: e.position)[:2]:
+        e.color = (v, v, v * 1.03, 1)
+
+
+WORLD_RAMP = studio_world()
 scene.world = world
 cam_data = bpy.data.cameras.new("cam")
 cam_data.clip_start = 0.001
@@ -1076,7 +1083,9 @@ shot("02_face", HC + mm(0, -430, 25), HC + mm(0, 0, 4), 100,
      studio() + [("sheen", HC + Vector((-0.10, -0.40, 0.30)), HC, 0.8, float(os.environ.get("SHEEN", "1.2")))])
 shot("03_top", HC + mm(0, 0, 460), HC, 85, studio(), up=(-1, 0, 0), head_only=True)
 shot("04_back", HC + mm(80, 470, 120), HC + mm(0, 0, 8), 85, studio())
-shot("05_sole", HC + mm(0, 0, -460), HC, 85, below(studio()), up=(0, -1, 0), head_only=True)
+world_floor(float(os.environ.get("SOLE_FLOOR", "0.12")))   # seen from below the sole faces the floor: keep it dim,
+shot("05_sole", HC + mm(0, 0, -460), HC, 85, below(studio()), up=(0, -1, 0), head_only=True)   # as in the sole photo
+world_floor(WORLD_STOPS[0][1])
 shot("06_toe", HC + mm(-440, 0, 40), HC, 90, studio(), head_only=True)
 shot("07_heel", HC + mm(440, 0, 40), HC, 90, studio(), head_only=True)
 mid = axis(430) * 0.001
