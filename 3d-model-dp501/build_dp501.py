@@ -701,7 +701,8 @@ root.scale = (0.001, 0.001, 0.001)
 bpy.context.view_layer.update()
 print("axis meets the sole at X=%.1f (heel end 53 -> %.1f mm), club length %.0f" % (P0.x, 53 - P0.x, CLUB_LEN))
 bpy.ops.file.pack_all()
-bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, "dp501_parkgolf.blend"))
+if not (os.environ.get("BRASS") or os.environ.get("GLIT")):   # a calibration build is not the model: keep the file
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, "dp501_parkgolf.blend"))
 if not RENDER:
     sys.exit(0)
 
