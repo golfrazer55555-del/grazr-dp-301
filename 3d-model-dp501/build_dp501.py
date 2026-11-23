@@ -215,10 +215,10 @@ def lacquer_into(nt, b, decal=None):
         nt.links.new(mix_f(nt, t.outputs["Alpha"], 0.12, 0.3), b.inputs["Roughness"])
 
 
-BRASS = (0.86, 0.60, 0.19, 1)
+BRASS = (0.62, 0.40, 0.10, 1)               # deep brushed gold as on the photos (a brighter base reads champagne)
 
 
-def brass(name, engraved=False, rough_range=(0.17, 0.25)):
+def brass(name, engraved=False, rough_range=(0.22, 0.32)):
     """Brushed brass, grain along X (toe-heel). Engraved: sand-blasted logos (recessed, sparkly), black DP-501,
     screw outlines; textures on UV 'sole' (planar from below)."""
     m, nt, b = principled(name)
@@ -226,7 +226,7 @@ def brass(name, engraved=False, rough_range=(0.17, 0.25)):
     return m
 
 
-def brass_into(nt, b, engraved=False, rough_range=(0.17, 0.25)):
+def brass_into(nt, b, engraved=False, rough_range=(0.22, 0.32)):
     b.inputs["Base Color"].default_value = BRASS
     b.inputs["Metallic"].default_value = 1.0
     b.inputs["Roughness"].default_value = 0.2
@@ -238,7 +238,7 @@ def brass_into(nt, b, engraved=False, rough_range=(0.17, 0.25)):
     nt.links.new(coord.outputs["Object"], mp.inputs["Vector"])
     nz = node(nt, "ShaderNodeTexNoise", Scale=1.0, Detail=12.0, Roughness=0.7)
     nt.links.new(mp.outputs["Vector"], nz.inputs["Vector"])
-    hair = node(nt, "ShaderNodeBump", Strength=0.06, Distance=0.00002)
+    hair = node(nt, "ShaderNodeBump", Strength=0.12, Distance=0.00002)          # visible brushing as on the photos
     nt.links.new(nz.outputs["Fac"], hair.inputs["Height"])
     normal = hair.outputs["Normal"]
     rough = node(nt, "ShaderNodeMapRange", **{"From Min": 0.3, "From Max": 0.7, "To Min": rough_range[0],
@@ -255,8 +255,8 @@ def brass_into(nt, b, engraved=False, rough_range=(0.17, 0.25)):
         spark = node(nt, "ShaderNodeTexVoronoi", Scale=9.0)               # sand-blast grains (object mm)
         spark.feature = "F1"
         nt.links.new(coord.outputs["Object"], spark.inputs["Vector"])
-        color = mix_rgb(nt, e.outputs["Color"], BRASS, (0.74, 0.46, 0.07, 1))   # sand-blasted: deeper, more yellow gold
-        color = mix_rgb(nt, r_.outputs["Color"], color, (0.60, 0.42, 0.13, 1))      # screws: faint line only
+        color = mix_rgb(nt, e.outputs["Color"], BRASS, (0.80, 0.55, 0.06, 1))   # sand-blasted: brighter, more yellow gold
+        color = mix_rgb(nt, r_.outputs["Color"], color, (0.05, 0.03, 0.006, 1))     # engraving rim: dark side wall
         color = mix_rgb(nt, k.outputs["Color"], color, (0.012, 0.012, 0.012, 1))
         sr = node(nt, "ShaderNodeMapRange", **{"To Min": 0.38, "To Max": 0.62})
         nt.links.new(spark.outputs["Distance"], sr.inputs["Value"])
@@ -805,6 +805,7 @@ def studio(c=HC, d=1.0):
 
 
 below = lambda L_: [(l[0], Vector((l[1].x, l[1].y, 2 * HC.z - l[1].z))) + tuple(l[2:]) for l in L_]
+dim = lambda L_, k: [(l[0], l[1], l[2], l[3], l[4] * k) + tuple(l[5:]) for l in L_]   # the sole photos: a darker room
 
 if ORTHO:
     flat = [("a", HC + Vector((0, 0, 0.6)), HC, 1.2, 25.0), ("b", HC + Vector((0, -0.6, 0.1)), HC, 1.2, 12.0),
@@ -837,8 +838,8 @@ if MATCH:
         cam_data.shift_x = -(c["cx"] - c["W"] / 2) / c["W"]
         cam_data.shift_y = (c["cy"] - c["H"] / 2) / c["W"]
         sole = c["fw"][2] > 0.5
-        world_floor(0.12 if sole else WORLD_STOPS[0][1])
-        lights = below(studio()) if sole else studio()
+        world_floor(0.12)                # the photos were taken over a dark table / room, not a bright floor
+        lights = dim(below(studio()), 0.6) if sole else studio()
         for o in CLUB:
             o.hide_render = False
         k = 1400.0 / max(c["W"], c["H"])
@@ -860,7 +861,7 @@ if PHOTO:
     shot("photo_face", HC + mm(0, -1100, 50), HC + mm(0, 0, 0), 200, studio() + [
         ("sheen", HC + Vector((-0.10, -0.40, 0.30)), HC, 0.8, 1.2)], **o)
     world_floor(0.12)
-    shot("photo_sole", HC + mm(0, 0, -1100), HC, 200, below(studio()), up=(0, -1, 0), head_only=True, **o)
+    shot("photo_sole", HC + mm(0, 0, -1100), HC, 200, dim(below(studio()), 0.6), up=(0, -1, 0), head_only=True, **o)
     world_floor(WORLD_STOPS[0][1])
     shot("photo_back", HC + mm(20, 1100, 75), HC + mm(0, 0, 4), 200, studio(), **o)
     # from above, looking down along the shaft as the owner's top-view photo (face left, nose right, toe up)
@@ -912,7 +913,7 @@ shot("02_face", HC + mm(0, -430, 25), HC + mm(0, 0, 4), 100,
 shot("03_top", HC + mm(0, 0, 460), HC, 85, studio(), up=(-1, 0, 0), head_only=True)
 shot("04_back", HC + mm(80, 470, 120), HC + mm(0, 0, 8), 85, studio())
 world_floor(float(os.environ.get("SOLE_FLOOR", "0.12")))   # seen from below the sole faces the floor: keep it dim,
-shot("05_sole", HC + mm(0, 0, -460), HC, 85, below(studio()), up=(0, -1, 0), head_only=True)   # as in the sole photo
+shot("05_sole", HC + mm(0, 0, -460), HC, 85, dim(below(studio()), 0.6), up=(0, -1, 0), head_only=True)   # as in the sole photo
 world_floor(WORLD_STOPS[0][1])
 shot("06_toe", HC + mm(-440, 0, 40), HC, 90, studio(), head_only=True)
 shot("07_heel", HC + mm(440, 0, 40), HC, 90, studio(), head_only=True)

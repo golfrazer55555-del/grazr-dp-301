@@ -8,7 +8,7 @@ Writes textures/:
   side_toe.png       PARKER 300 UNIT / LIMITED EDITION + two-tone GR   box TOE_BOX
   sole_engrave.png   sand-blasted engraving mask, planar from below (U = (X+53)/106, V = 1 - Y/95)
   sole_black.png     black-filled DP-501
-  sole_rings.png     screw outlines (empty: the owner asked for no screws)
+  sole_rings.png     dark rim round the engraving (no screws: owner)
   shaft_wrap.png     250 mm graphic band, U along the shaft (grip side = 0), V around (front = 0.5)
   grip_albedo.png / grip_bump.png / grip_cap.png
   carbon.png         plain-weave tile (R = warp mask, G = tow height, B = fibre streaks), 2 x 2 cells of 2.15 mm
@@ -266,7 +266,12 @@ def sole(ppm=15):
     dp_im = Image.fromarray((dp * 255).astype(np.uint8))
     place(blk, dp_im, org, ((398 + 585) / 2 - 491) / 6.55, ((610 + 656) / 2 - 170) / 6.55,
           w_mm=(585 - 398) / 6.55, h_mm=(656 - 610) / 6.55, ppm=ppm)
-    # no screw marks (owner): sole_rings.png stays empty
+    # no screw marks (owner). sole_rings.png now holds the engraving's dark rim (its side wall, as on the photos):
+    # a thin band just outside every sand-blasted shape
+    e_ = np.asarray(eng).astype(np.float32) / 255
+    rim = np.clip(ndimage.maximum_filter(e_, size=3) - e_, 0, 1)
+    rim = np.clip(ndimage.gaussian_filter(rim, 0.6) * 1.6, 0, 1)
+    rings = Image.fromarray((rim * 255).astype(np.uint8))
     eng.save(os.path.join(TEX, "sole_engrave.png"))
     blk.save(os.path.join(TEX, "sole_black.png"))
     rings.save(os.path.join(TEX, "sole_rings.png"))
