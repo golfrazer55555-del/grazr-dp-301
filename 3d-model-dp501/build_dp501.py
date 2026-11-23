@@ -216,6 +216,13 @@ def lacquer_into(nt, b, decal=None):
 
 
 BRASS = (0.62, 0.40, 0.10, 1)               # deep brushed gold as on the photos (a brighter base reads champagne)
+# glitter in the sole engraving: flake scale (1/mm), darkest flake shade, normal tilt, flake roughness, colour
+GLIT = dict(scale=9.0, shade=0.72, tilt=0.6, rough=(0.10, 0.30), color=(0.95, 0.70, 0.08, 1))
+if os.environ.get("BRASS"):                  # calibration: BRASS=r,g,b  GLIT=scale,shade,tilt,rmin,rmax,r,g,b
+    BRASS = tuple(map(float, os.environ["BRASS"].split(","))) + (1,)
+if os.environ.get("GLIT"):
+    _g = list(map(float, os.environ["GLIT"].split(",")))
+    GLIT = dict(scale=_g[0], shade=_g[1], tilt=_g[2], rough=(_g[3], _g[4]), color=tuple(_g[5:8]) + (1,))
 
 
 def brass(name, engraved=False, rough_range=(0.22, 0.32)):
@@ -253,23 +260,23 @@ def brass_into(nt, b, engraved=False, rough_range=(0.22, 0.32)):
         k = tex(nt, img("sole_black.png", False), "sole")
         r_ = tex(nt, img("sole_rings.png", False), "sole")
         # gold glitter in the engraving (photos): flakes ~0.1 mm, each its own tilt and shade, so they twinkle
-        spark = node(nt, "ShaderNodeTexVoronoi", Scale=9.0, Randomness=1.0)
+        spark = node(nt, "ShaderNodeTexVoronoi", Scale=GLIT["scale"], Randomness=1.0)
         spark.feature = "F1"
         nt.links.new(coord.outputs["Object"], spark.inputs["Vector"])
         flake = nt.nodes.new("ShaderNodeSeparateColor")
         nt.links.new(spark.outputs["Color"], flake.inputs[0])
-        shade = node(nt, "ShaderNodeMapRange", **{"To Min": 0.72, "To Max": 1.0})
+        shade = node(nt, "ShaderNodeMapRange", **{"To Min": GLIT["shade"], "To Max": 1.0})
         nt.links.new(flake.outputs[0], shade.inputs["Value"])
         glit = nt.nodes.new("ShaderNodeMix")
         glit.data_type = "RGBA"
         glit.blend_type = "MULTIPLY"
         glit.inputs["Factor"].default_value = 1.0
-        glit.inputs[6].default_value = (0.95, 0.70, 0.08, 1)               # glitter gold
+        glit.inputs[6].default_value = GLIT["color"]                       # glitter gold
         nt.links.new(shade.outputs["Result"], glit.inputs[7])
         color = mix_rgb(nt, e.outputs["Color"], BRASS, glit.outputs[2])
         color = mix_rgb(nt, r_.outputs["Color"], color, (0.05, 0.03, 0.006, 1))     # engraving rim: dark side wall
         color = mix_rgb(nt, k.outputs["Color"], color, (0.012, 0.012, 0.012, 1))
-        sr = node(nt, "ShaderNodeMapRange", **{"To Min": 0.10, "To Max": 0.30})      # shiny flakes
+        sr = node(nt, "ShaderNodeMapRange", **{"To Min": GLIT["rough"][0], "To Max": GLIT["rough"][1]})  # shiny flakes
         nt.links.new(flake.outputs[1], sr.inputs["Value"])
         rough = mix_f(nt, e.outputs["Color"], rough, sr.outputs["Result"])
         rough = mix_f(nt, k.outputs["Color"], rough, 0.45)
@@ -295,7 +302,7 @@ def brass_into(nt, b, engraved=False, rough_range=(0.22, 0.32)):
         sc = nt.nodes.new("ShaderNodeVectorMath")
         sc.operation = "SCALE"
         nt.links.new(tilt.outputs[0], sc.inputs[0])
-        sc.inputs["Scale"].default_value = 0.6
+        sc.inputs["Scale"].default_value = GLIT["tilt"]
         add = nt.nodes.new("ShaderNodeVectorMath")
         add.operation = "ADD"
         nt.links.new(eb.outputs["Normal"], add.inputs[0])
@@ -867,7 +874,7 @@ if MATCH:
         lights = dim(below(studio()), 0.6) if sole else studio()
         for o in CLUB:
             o.hide_render = False
-        k = 1400.0 / max(c["W"], c["H"])
+        k = float(os.environ.get("MATCH_RES", "1400")) / max(c["W"], c["H"])
         scene.render.resolution_x, scene.render.resolution_y = round(c["W"] * k), round(c["H"] * k)
         for o in [o for o in col.objects if o.type == "LIGHT"]:
             bpy.data.objects.remove(o, do_unlink=True)
