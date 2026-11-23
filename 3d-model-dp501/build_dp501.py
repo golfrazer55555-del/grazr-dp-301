@@ -1013,12 +1013,12 @@ if SITE:
     ]
     # hero: whole head right of centre and above the middle (the page copy sits bottom left over the dark)
     d_h = Vector((-0.30, -0.24, 0.13)).normalized()
-    shot("hero", HC + d_h * 0.58, HC + mm(0, 0, 4), 70, key(HC),
-         res=(1920, 1080), shift=(-0.10, -0.03), glow=(0.60, 0.42), **dark)
+    shot("hero", HC + d_h * 0.70, HC + mm(0, 0, 4), 70, key(HC),
+         res=(1920, 1080), shift=(-0.10, -0.094), glow=(0.60, 0.33), **dark)
     # phones crop the 4:5 picture to its middle: head centred, upper half, copy below
     d_m = Vector((-0.22, -0.30, 0.16)).normalized()
-    shot("hero_m", HC + d_m * 0.52, HC + mm(0, 0, 4), 60, key(HC),
-         res=(1080, 1350), shift=(0.045, -0.10), glow=(0.5, 0.36), **dark)
+    shot("hero_m", HC + d_m * 0.60, HC + mm(0, 0, 4), 60, key(HC),
+         res=(1080, 1350), shift=(0.045, -0.13), glow=(0.5, 0.33), **dark)
     mid = axis(430) * 0.001
     full_l = [("key", mid + Vector((-0.8, -1.5, 1.2)), mid, 1.0, 70), ("rim", mid + Vector((0.6, 1.2, 0.8)), mid, 0.8, 60),
               ("rim2", mid + Vector((-1.0, 0.8, 0.3)), mid, 0.8, 35)]
