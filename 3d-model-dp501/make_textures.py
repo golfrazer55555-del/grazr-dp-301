@@ -318,53 +318,79 @@ def shaft_wrap(scale=4):
 
 
 # ------------------------------------------------------------------ grip
-GRIP_LEN = 350.0
-GRIP_CIRC = math.pi * 27.6
+GRIP_LEN = 280.0                            # owner's measurement
+GRIP_CIRC = math.pi * 28.0
+GRIP_N = 20                                 # hexagons round the grip (photo: rows 3.8 mm apart along it)
 
 
 def grip():
-    """U = around (front at 0.5), V = along (grip end at V = 1). Pyramid (diamond) pattern, ribbed panel on the
-    front 35-70 % from the end, gold GRAZR label 70-78 %, stars near both ends, embossed round logo at 13 %."""
+    """U = around (front at 0.5), V = along (grip end at V = 1). Measured on the grip photos (front / back / sides,
+    6.48 px/mm): hexagonal pyramids, pointed ends along the grip, 20 round, rows 3.8 mm apart; smooth end bands
+    (12.5 mm at the end, 8.5 mm at the shaft); a ribbed panel on the front 33.5-72 % from the end, 13.5 mm wide, one
+    rib per hexagon row; recessed label panel 73.5-85.5 % with gold GRAZR; gold stars in both bands; round logo with
+    an S line at 13 %."""
     W_, H_ = 1024, 4096
     v, u = np.mgrid[0:H_, 0:W_].astype(np.float32)
     from_end = v / H_ * GRIP_LEN                     # mm from the grip end (image top = grip end)
     around = (u / W_ - 0.5) * GRIP_CIRC             # mm around from the front centre
-    p = 5.4
-    a1 = (around + from_end) / (p * math.sqrt(2))
-    a2 = (around - from_end) / (p * math.sqrt(2))
-    fu = a1 - np.floor(a1) - 0.5
-    fv = a2 - np.floor(a2) - 0.5
-    pyr = 1 - 2 * np.maximum(np.abs(fu), np.abs(fv))          # square pyramids on a 45 deg lattice = diamonds
-    facet = np.where(np.abs(fu) > np.abs(fv), 0.06 * np.sign(fu), 0.0)  # split each face for the star look
-    height = np.clip(pyr, 0, 1) ** 0.9 + facet
-    panel = (np.abs(around) < 5.2) & (from_end > 0.35 * GRIP_LEN) & (from_end < 0.70 * GRIP_LEN)
-    ribs = 0.5 + 0.5 * np.cos(from_end * 2 * math.pi / 2.2)
-    label = (np.abs(around) < 4.2) & (from_end > 0.70 * GRIP_LEN) & (from_end < 0.785 * GRIP_LEN)
-    height = np.where(panel, 0.25 + 0.35 * ribs, height)
-    height = np.where(label, 0.55, height)
-    ends = (from_end < 7.5) | (from_end > GRIP_LEN - 5)
+    sp = GRIP_CIRC / GRIP_N                          # hexagon spacing round the grip
+    rh = sp * math.sqrt(3) / 2                       # row spacing along the grip
+    best = np.full(around.shape, np.inf, np.float32)
+    dx_b = np.zeros_like(around)
+    dy_b = np.zeros_like(around)
+    k0 = np.floor(from_end / rh)
+    for dk in (0, 1):
+        k = k0 + dk
+        off = (k % 2) * 0.5
+        j = np.round(around / sp - off)
+        cxh, cyh = (j + off) * sp, k * rh
+        dx, dy = around - cxh, from_end - cyh
+        dd = dx * dx + dy * dy
+        m = dd < best
+        best = np.where(m, dd, best)
+        dx_b = np.where(m, dx, dx_b)
+        dy_b = np.where(m, dy, dy_b)
+    # pointed-top hexagon: flat sides left / right; distance to the sides along the three face normals
+    n1 = np.abs(dx_b)
+    n2 = np.abs(dx_b * 0.5 + dy_b * math.sqrt(3) / 2)
+    n3 = np.abs(dx_b * 0.5 - dy_b * math.sqrt(3) / 2)
+    hexd = np.maximum(n1, np.maximum(n2, n3)) / (sp / 2)
+    height = np.clip(1 - hexd, 0, 1)
+    panel = (np.abs(around) < 6.75) & (from_end > 0.335 * GRIP_LEN) & (from_end < 0.72 * GRIP_LEN)
+    t = (from_end / rh + 0.5) % 1.0                  # ribs sit on the hexagon rows
+    rib = np.clip((0.5 - np.abs(t - 0.5)) / 0.12, 0, 1)
+    rib_end = np.clip((6.75 - np.abs(around)) / 1.2, 0, 1)        # bevelled ends
+    height = np.where(panel, 0.15 + 0.6 * rib * rib_end, height)
+    label = (np.abs(around) < 5.2) & (from_end > 0.735 * GRIP_LEN) & (from_end < 0.855 * GRIP_LEN)
+    height = np.where(label, 0.3, height)
+    ends = (from_end < 12.5) | (from_end > GRIP_LEN - 8.5)
     height = np.where(ends, 0.6, height)
-    # embossed round logo at 13 %
-    cyl = (around ** 2 + (from_end - 0.13 * GRIP_LEN) ** 2) ** 0.5
-    ring = (np.abs(cyl - 3.6) < 0.35)
-    height = np.where(cyl < 4.2, np.where(ring, 0.85, 0.5), height)
+    # round logo with an S line at 13 %
+    lc = 0.13 * GRIP_LEN
+    ry, rx = from_end - lc, around
+    rr = np.hypot(rx, ry)
+    R0 = 4.6
+    s_line = np.where(rx >= 0, np.abs(np.hypot(rx, ry + R0 / 2) - R0 / 2), np.abs(np.hypot(rx, ry - R0 / 2) - R0 / 2))
+    logo = rr < R0 + 0.45
+    lh = np.where(np.abs(rr - R0) < 0.4, 0.25, np.where(s_line < 0.3, 0.3, 0.55))
+    height = np.where(logo, lh, height)
     Image.fromarray((np.clip(height, 0, 1) * 255).astype(np.uint8)).save(os.path.join(TEX, "grip_bump.png"))
     alb = np.full((H_, W_, 3), 0.022, np.float32)
-    alb[panel] = 0.018
+    alb[panel] = 0.019
     alb[label] = 0.012
     img = Image.fromarray((alb * 255).astype(np.uint8))
     _, word = logo_masks()
     wm = word.rotate(-90, expand=True)                           # reads from the grip end down
-    hpx = int(0.075 * H_)
+    hpx = int(0.096 * H_)                                        # gold text 75-84.6 % from the end
     wm = wm.resize((max(1, int(wm.width * hpx / wm.height)), hpx), Image.LANCZOS)
-    img.paste(Image.new("RGB", wm.size, GOLD), (W_ // 2 - wm.width // 2, int(0.742 * H_) - hpx // 2), wm)
+    img.paste(Image.new("RGB", wm.size, GOLD), (W_ // 2 - wm.width // 2, int(0.798 * H_) - hpx // 2), wm)
     d = ImageDraw.Draw(img)
-    for frac in (0.032, 0.962):
-        cxp, cyp, rr = W_ / 2, frac * H_, 0.012 * W_ * 2.2
+    for frac in (8.3 / GRIP_LEN, 1 - 4.5 / GRIP_LEN):
+        cxp, cyp, rr_ = W_ / 2, frac * H_, 0.012 * W_ * 2.2
         pts = []
         for k in range(10):
             ang = -math.pi / 2 + k * math.pi / 5
-            q = rr if k % 2 == 0 else rr * 0.42
+            q = rr_ if k % 2 == 0 else rr_ * 0.42
             pts.append((cxp + q * math.cos(ang), cyp + q * math.sin(ang) * 1.0))
         d.polygon(pts, fill=GOLD)
     img.save(os.path.join(TEX, "grip_albedo.png"))
