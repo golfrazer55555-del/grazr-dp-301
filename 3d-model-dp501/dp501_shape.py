@@ -151,7 +151,7 @@ def front_round(y):
 P = dict(
     zc_face=41.5, zc_tip=44.5, zc_y0=45.0,        # corner line height (face photo / heel drawing's nose tip)
     k_up_side=0.745, k_up_back=1.10,              # upper chamfer slope (dz per mm inwards): 36.7 deg / 48 deg
-    cot_side=6.99, cot_back=3.6, p_wall=8.0,      # side wall leans in 8.1 deg going down; back face 74 deg at the tip
+    cot_side=6.99, cot_back=4.0, p_wall=2.0,      # side wall leans in 8.1 deg going down; back face 76 deg at the tip
     c_top=2.7, c_bot=14.0,                        # corner round: curvature radius c / 2 at the corner line
     crown=0.0014,                                 # crown drop dz = crown * x^2
     xf=25.8, k_lc=0.533, kappa=0.181, xf_c=16.64,  # lower chamfer, 28 deg: from |x| 25.8 (face photo), narrowing to
@@ -195,8 +195,7 @@ def surfaces(x, y, want=("zt", "zb")):
     wb = back_weight(ny)
     zc = zc_line(q[:, 1])
     kup = P["k_up_side"] + (P["k_up_back"] - P["k_up_side"]) * wb
-    # the wall keeps the sides' slope well round the nose (the brass weight's sides are a vertical plane on the back
-    # photo) and leans back only near the tip
+    # the wall's lean changes smoothly round the nose (a lean concentrated at the tip dents the back face)
     cot = P["cot_side"] + (P["cot_back"] - P["cot_side"]) * np.clip(ny, 0, 1) ** P["p_wall"]
     cham = zc + np.sqrt(P["c_top"] * d + (kup * d) ** 2)
     crown = top_line(y) - P["crown"] * xc ** 2

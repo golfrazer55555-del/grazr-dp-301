@@ -8,7 +8,7 @@ Writes textures/:
   side_toe.png       PARKER 300 UNIT / LIMITED EDITION + two-tone GR   box TOE_BOX
   sole_engrave.png   sand-blasted engraving mask, planar from below (U = (X+53)/106, V = 1 - Y/95)
   sole_black.png     black-filled DP-501
-  sole_rings.png     screw outlines
+  sole_rings.png     screw outlines (empty: the owner asked for no screws)
   shaft_wrap.png     250 mm graphic band, U along the shaft (grip side = 0), V around (front = 0.5)
   grip_albedo.png / grip_bump.png / grip_cap.png
   carbon.png         plain-weave tile (R = warp mask, G = tow height, B = fibre streaks), 2 x 2 cells of 2.15 mm
@@ -207,6 +207,19 @@ def drawing_leaf(upscale=4):
         if sizes[i] > 60:
             keep |= lab == i + 1
     m = m * ndimage.binary_dilation(keep, iterations=1)
+    # a thin vertical line in the drawing leaves a narrow straight gap through the leaf: fill columns whose 1-3 px gap
+    # (leaf on both sides) runs a long way down; the diagonal vein moves across columns and is kept
+    on = m > 0.5
+    for j in range(3, m.shape[1] - 3):
+        gap = ~on[:, j] & (on[:, j - 3] | on[:, j - 2]) & (on[:, j + 2] | on[:, j + 3])
+        if gap.sum() > 25:
+            for jj in (j - 1, j, j + 1):
+                m[:, jj] = np.where(gap, np.maximum(m[:, jj - 2], m[:, jj + 2]), m[:, jj])
+    holes = ndimage.binary_fill_holes(m > 0.5) & ~(m > 0.5)
+    lab_h, nh = ndimage.label(holes)
+    for i in range(1, nh + 1):
+        if (lab_h == i).sum() < 40:                                      # pin holes, not the vein
+            m[lab_h == i] = 1.0
     big = cv2.resize(m, (m.shape[1] * upscale, m.shape[0] * upscale), interpolation=cv2.INTER_CUBIC)
     big = cv2.GaussianBlur(big, (0, 0), upscale * 0.5)
     return smooth_alpha(big, 0.4, 0.6), (x0, y0, x1, y1)
@@ -253,11 +266,7 @@ def sole(ppm=15):
     dp_im = Image.fromarray((dp * 255).astype(np.uint8))
     place(blk, dp_im, org, ((398 + 585) / 2 - 491) / 6.55, ((610 + 656) / 2 - 170) / 6.55,
           w_mm=(585 - 398) / 6.55, h_mm=(656 - 610) / 6.55, ppm=ppm)
-    # screws: present on the real sole but barely outlined (owner): a fine, faint line
-    d = ImageDraw.Draw(rings)
-    for X, Y in ((-41, 14), (41, 14), (-37.5, 47), (37.5, 47), (0, 84.3)):
-        cx, cy, rr = (X + 53) * ppm, Y * ppm, 1.8 * ppm
-        d.ellipse([cx - rr, cy - rr, cx + rr, cy + rr], outline=255, width=2)     # fine line, no strong outline
+    # no screw marks (owner): sole_rings.png stays empty
     eng.save(os.path.join(TEX, "sole_engrave.png"))
     blk.save(os.path.join(TEX, "sole_black.png"))
     rings.save(os.path.join(TEX, "sole_rings.png"))
@@ -320,13 +329,13 @@ def shaft_wrap(scale=4):
 # ------------------------------------------------------------------ grip
 GRIP_LEN = 280.0                            # owner's measurement
 GRIP_CIRC = math.pi * 28.0
-GRIP_N = 14                                 # hexagon columns round the grip (photos: ~6.6 mm apart)
+GRIP_N = 10                                 # columns of pyramid vertices round the grip (photos: ~9 mm apart)
 
 
 def grip():
     """U = around (front at 0.5), V = along (grip end at V = 1). Measured on the grip photos (front / back / sides,
-    6.48 px/mm): hexagonal pyramids 7.6 mm apart along the grip, 14 columns round it, flat sides facing the grip
-    ends; smooth end bands
+    6.48 px/mm): pyramid bumps on a triangle tiling (edges along the grip every 7.7 mm, 10 columns round it);
+    smooth end bands
     (12.5 mm at the end, 8.5 mm at the shaft); a ribbed panel on the front 33.5-72 % from the end, 18 mm wide, ribs
     every 3.8 mm; recessed label panel 73.5-85.5 % with gold GRAZR; gold stars in both bands; round logo with
     an S line at 13 %."""
@@ -334,31 +343,20 @@ def grip():
     v, u = np.mgrid[0:H_, 0:W_].astype(np.float32)
     from_end = v / H_ * GRIP_LEN                     # mm from the grip end (image top = grip end)
     around = (u / W_ - 0.5) * GRIP_CIRC             # mm around from the front centre
-    # hexagon centres in columns along the grip, 7.6 mm apart (photos: 50 px at 6.48 px/mm), neighbouring columns
-    # half a step along; GRIP_N (even) columns round the grip so the pattern closes; flat sides face the grip ends
-    per = 7.6
+    # pyramid bumps tiling the grip (photos, owner): triangles with one edge along the grip, vertices every 7.7 mm
+    # along it (photos: 50 px at 6.48 px/mm), GRIP_N (even) columns of vertices round it, neighbouring columns half a
+    # step along; each triangle rises to a point at its centre (three facets)
+    per = 7.7
     cw = GRIP_CIRC / GRIP_N
-    sq = (per * math.sqrt(3) / 2) / cw                # around -> regular hexagon space
-    best = np.full(around.shape, np.inf, np.float32)
-    dx_b = np.zeros_like(around)
-    dy_b = np.zeros_like(around)
-    j0 = np.floor(around / cw)
-    for dj in (0, 1):
-        j = j0 + dj
-        off = (j % 2) * 0.5
-        k = np.round(from_end / per - off)
-        dx = (around - j * cw) * sq
-        dy = from_end - (k + off) * per
-        dd = dx * dx + dy * dy
-        m = dd < best
-        best = np.where(m, dd, best)
-        dx_b = np.where(m, dx, dx_b)
-        dy_b = np.where(m, dy, dy_b)
-    n1 = np.abs(dy_b)                                                  # flat sides facing the grip ends
-    n2 = np.abs(dy_b * 0.5 + dx_b * math.sqrt(3) / 2)
-    n3 = np.abs(dy_b * 0.5 - dx_b * math.sqrt(3) / 2)
-    hexd = np.maximum(n1, np.maximum(n2, n3)) / (per / 2)
-    height = np.clip(1 - hexd, 0, 1)
+    hh = per * math.sqrt(3) / 2
+    xs_ = around * (hh / cw)                          # -> equilateral triangle space
+    fr = []
+    for nx, ny in ((1.0, 0.0), (-0.5, math.sqrt(3) / 2), (-0.5, -math.sqrt(3) / 2)):
+        t_ = (xs_ * nx + from_end * ny) / hh
+        fr.append(t_ - np.floor(t_))
+    up = (fr[0] + fr[1] + fr[2]) < 1.5
+    gg = [np.where(up, f_, 1 - f_) for f_ in fr]
+    height = np.clip(3 * np.minimum(gg[0], np.minimum(gg[1], gg[2])), 0, 1)
     panel = (np.abs(around) < 9.0) & (from_end > 0.335 * GRIP_LEN) & (from_end < 0.72 * GRIP_LEN)
     t = (from_end / (per / 2) + 0.5) % 1.0           # ribs every half step (photo: 24 px)
     rib = np.clip((0.5 - np.abs(t - 0.5)) / 0.12, 0, 1)
@@ -373,7 +371,10 @@ def grip():
     ry, rx = from_end - lc, around
     rr = np.hypot(rx, ry)
     R0 = 5.6
-    s_line = np.where(rx >= 0, np.abs(np.hypot(rx, ry + R0 / 2) - R0 / 2), np.abs(np.hypot(rx, ry - R0 / 2) - R0 / 2))
+    # the S runs left -> right as on the photo: left half dips towards the head, right half rises towards the end
+    s_line = np.where(rx < 0,
+                      np.where(ry >= 0, np.abs(np.hypot(rx + R0 / 2, ry) - R0 / 2), 9.0),
+                      np.where(ry <= 0, np.abs(np.hypot(rx - R0 / 2, ry) - R0 / 2), 9.0))
     logo = rr < R0 + 0.45
     lh = np.where(np.abs(rr - R0) < 0.4, 0.25, np.where(s_line < 0.3, 0.3, 0.55))
     height = np.where(logo, lh, height)
@@ -392,7 +393,7 @@ def grip():
         cxp, cyp, rr_ = W_ / 2, frac * H_, 0.012 * W_ * 2.2
         pts = []
         for k in range(10):
-            ang = -math.pi / 2 + k * math.pi / 5
+            ang = math.pi / 2 + k * math.pi / 5                     # one point towards the head (photos)
             q = rr_ if k % 2 == 0 else rr_ * 0.42
             pts.append((cxp + q * math.cos(ang), cyp + q * math.sin(ang) * 1.0))
         d.polygon(pts, fill=GOLD)
