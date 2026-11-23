@@ -212,8 +212,13 @@
           src: box.getAttribute("data-src"), alt: box.getAttribute("data-alt"),
           "camera-controls": "", "touch-action": "pan-y", "interaction-prompt": "auto",
           ar: "", "ar-modes": "webxr scene-viewer quick-look", "ar-scale": "fixed",
-          "shadow-intensity": "1", "shadow-softness": "0.8", exposure: "1.15", "environment-image": "neutral",
-          "camera-target": "0m 0.016m -0.034m", "camera-orbit": "-32deg 76deg 0.30m", "field-of-view": "30deg",
+          "shadow-intensity": "1", "shadow-softness": "0.8", exposure: box.getAttribute("data-exposure") || "1.15",
+          "environment-image": "neutral",
+          // per product (data-target / data-orbit / data-fov); a portrait box (phones) may start further out
+          "camera-target": box.getAttribute("data-target") || "0m 0.016m -0.034m",
+          "camera-orbit": (box.clientHeight > box.clientWidth && box.getAttribute("data-orbit-portrait")) ||
+            box.getAttribute("data-orbit") || "-32deg 76deg 0.30m",
+          "field-of-view": box.getAttribute("data-fov") || "30deg",
           "min-camera-orbit": "auto auto 0.18m", "max-camera-orbit": "auto auto 2.6m"
         };
         Object.keys(attrs).forEach(function (k) { mv.setAttribute(k, attrs[k]); });

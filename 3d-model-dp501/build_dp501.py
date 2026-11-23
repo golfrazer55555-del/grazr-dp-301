@@ -33,6 +33,7 @@ ORTHO = "--ortho" in sys.argv
 SITE = "--site" in sys.argv               # dark-studio stills for the website (site/) instead of the approval set
 PHOTO = "--photo" in sys.argv             # views matching the owner's photos (check/photo_*.png) for side-by-side checks
 MATCH = "--match" in sys.argv             # the owner's photos' own cameras (check/photo_cams.json) -> check/match_*.png
+WEB = "--web" in sys.argv                 # light model for the website's 3D viewer -> dp501_parkgolf.glb (no renders)
 SAMPLES = int(os.environ.get("SAMPLES", "128"))
 
 # ================================================================ measured shape (SPEC.md; the head is dp501_shape.py)
@@ -424,13 +425,14 @@ I_LACQ, I_TOP, I_HEEL, I_TOE, I_CARBON, I_BRASS, I_SOLE, I_SEAM = range(8)
 # ================================================================ head surface
 # rows: 3 deg steps over the face plate's 1 mm front round, 0.35 mm along the body, 0.1 mm over the nose; rows sit
 # exactly on the face plate seam and on the brass nose boundary, so those material borders are clean edges
-_phi = np.radians(np.arange(0.0, 90.0, 3.0))
-rows = np.concatenate([S.FRONT_R * (1 - np.cos(_phi)), [1.25, 1.75, 2.5], np.arange(3.1, 86.0, 0.35),
-                       np.arange(86.0, TIP_Y - 0.15, 0.1), [TIP_Y - 0.1, TIP_Y - 0.06, TIP_Y - 0.03, TIP_Y - 0.012]])
+# (--web: the same rows and columns, only sparser)
+_phi = np.radians(np.arange(0.0, 90.0, 10.0 if WEB else 3.0))
+rows = np.concatenate([S.FRONT_R * (1 - np.cos(_phi)), [1.25, 1.75, 2.5], np.arange(3.1, 86.0, 1.1 if WEB else 0.35),
+                       np.arange(86.0, TIP_Y - 0.15, 0.3 if WEB else 0.1), [TIP_Y - 0.1, TIP_Y - 0.06, TIP_Y - 0.03, TIP_Y - 0.012]])
 rows = np.unique(np.round(np.concatenate([rows, [FACE_T - SEAM, FACE_T + SEAM, NOSE_Y, 41.3 * K_Y, 42.7 * K_Y]]), 6))
 rows = rows[~np.isclose(rows, FACE_T)]
-NO, NI = 60, 64           # top: columns per side on the chamfer (outline -> upper crease) and on the crown
-NW, NL = 48, 64           # bottom: on the side wall (outline -> lower crease) and on the sole / lower chamfer
+NO, NI = (22, 24) if WEB else (60, 64)    # top: columns per side on the chamfer (outline -> upper crease), crown
+NW, NL = (18, 24) if WEB else (48, 64)    # bottom: on the side wall (outline -> lower crease), sole / lower chamfer
 
 
 def _crease(y, w, inner_minus_outer):
@@ -592,6 +594,8 @@ def axis(s):
 
 
 def tube(name, s0, s1, radius_at, steps, mats, uv_fn=None, seg=96, cap_top=False):
+    if WEB:
+        steps, seg = max(1, round(steps * 0.45)), 64
     bm = bmesh.new()
     lay = bm.loops.layers.uv.new("proj")
     rings = []
@@ -694,6 +698,88 @@ nt.links.new(tc.outputs["Color"], b.inputs["Base Color"])
 b.inputs["Roughness"].default_value = 0.55
 cap.data.materials.append(m)
 
+
+def web_export():
+    """Light model for the website's 3D viewer (--web): the same shapes with sparser rows and columns, and the
+    render materials rebuilt from plain images (web_textures.py: decals, glitter sole, carbon weave, grip) because
+    glTF cannot carry Blender's node mixes; WebP textures in one GLB -> dp501_parkgolf.glb."""
+    import tempfile
+    import web_textures as WT
+    tmp = tempfile.mkdtemp(prefix="dp501_web_")
+    # the web viewer maps colours without the render's AgX roll-off, so the same brass reads about 1.7x more
+    # saturated there (measured in the viewer, Lab chroma 42 vs 25): the web model takes the colours toward grey
+    desat = lambda c, k: tuple([(0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) * (1 - k) + v * k for v in c[:3]]) + (1,)
+    wbrass = desat(BRASS, 0.62)
+    wglit = dict(GLIT, color=desat(GLIT["color"], 0.70))
+    p = lambda n: os.path.join(tmp, n)
+    top = WT.decal("top_decal.png", p("top"), BLACK)
+    heel = WT.decal("side_heel.png", p("heel"), BLACK)
+    toe = WT.decal("side_toe.png", p("toe"), BLACK)
+    sole_t = WT.sole(p("sole"), wbrass, wglit, BLACK, HEAD_W, HEAD_D)
+    carb = WT.carbon(p("carbon"), (0.135, 0.145, 0.19, 1))
+    grip_t = WT.grip(p("grip"), GRIP_LEN, math.pi * 28.0)
+    shaft_t = WT.shaft(p("shaft"), BLACK)
+    cap_t = WT.cap(p("cap"))
+
+    def wmat(name, base=BLACK, rough=0.4, metal=0.0, uv="proj", base_img=None, mr_img=None, n_img=None,
+             ext="EXTEND", coat=0.0, coat_rough=0.03):
+        m, nt, b = principled(name + "_web")
+        b.inputs["Base Color"].default_value = base
+        b.inputs["Roughness"].default_value = rough
+        b.inputs["Metallic"].default_value = metal
+        b.inputs["Coat Weight"].default_value = coat
+        b.inputs["Coat Roughness"].default_value = coat_rough
+
+        def t(path, srgb):
+            im = bpy.data.images.load(path)
+            im.colorspace_settings.name = "sRGB" if srgb else "Non-Color"
+            return tex(nt, im, uv, ext)
+        if base_img:
+            nt.links.new(t(base_img, True).outputs["Color"], b.inputs["Base Color"])
+        if mr_img:
+            sep = nt.nodes.new("ShaderNodeSeparateColor")
+            nt.links.new(t(mr_img, False).outputs["Color"], sep.inputs[0])
+            nt.links.new(sep.outputs[1], b.inputs["Roughness"])
+            nt.links.new(sep.outputs[2], b.inputs["Metallic"])
+        if n_img:
+            nm = nt.nodes.new("ShaderNodeNormalMap")
+            nm.uv_map = uv
+            nt.links.new(t(n_img, False).outputs["Color"], nm.inputs["Color"])
+            nt.links.new(nm.outputs["Normal"], b.inputs["Normal"])
+        return m
+
+    gloss = dict(coat=1.0, coat_rough=0.012)
+    web = {
+        "DP501_Lacquer": wmat("DP501_Lacquer", BLACK, 0.12, **gloss),
+        "DP501_TopGraphic": wmat("DP501_TopGraphic", base_img=top[0], mr_img=top[1], **gloss),
+        "DP501_HeelLettering": wmat("DP501_HeelLettering", base_img=heel[0], mr_img=heel[1], **gloss),
+        "DP501_ToeLettering": wmat("DP501_ToeLettering", base_img=toe[0], mr_img=toe[1], **gloss),
+        "DP501_CarbonFace": wmat("DP501_CarbonFace", base_img=carb[0], mr_img=carb[1], n_img=carb[2], ext="REPEAT",
+                                 coat=1.0, coat_rough=0.045),
+        "DP501_Brass": wmat("DP501_Brass", wbrass, 0.27, 1.0),
+        "DP501_SoleEngraved": wmat("DP501_SoleEngraved", uv="sole", base_img=sole_t[0], mr_img=sole_t[1],
+                                   n_img=sole_t[2]),
+        "DP501_FacePin": wmat("DP501_FacePin", wbrass, 0.37, 1.0),
+        "DP501_FacePlateSeam": wmat("DP501_FacePlateSeam", (0.002, 0.002, 0.002, 1), 0.55),
+        "DP501_Shaft": wmat("DP501_Shaft", base_img=shaft_t[0], mr_img=shaft_t[1], **gloss),
+        "DP501_Ferrule": wmat("DP501_Ferrule", BLACK, 0.08, coat=1.0, coat_rough=0.015),
+        "DP501_HoloBand": wmat("DP501_HoloBand", (0.80, 0.56, 0.20, 1), 0.2, 1.0),
+        "DP501_Grip": wmat("DP501_Grip", rough=0.62, base_img=grip_t[0], n_img=grip_t[1], ext="REPEAT"),
+        "DP501_GripCap": wmat("DP501_GripCap", rough=0.55, base_img=cap_t),
+    }
+    tris = 0
+    for o in col.objects:
+        if o.type == "MESH":
+            for slot in o.material_slots:
+                slot.material = web[slot.material.name.replace("_web", "")]
+            tris += sum(len(f.vertices) - 2 for f in o.data.polygons)
+    out = os.path.join(HERE, "dp501_parkgolf.glb")
+    bpy.ops.export_scene.gltf(filepath=out, export_format="GLB", use_selection=False, export_apply=True,
+                              export_yup=True, export_image_format="WEBP", export_image_quality=88,
+                              export_cameras=False, export_lights=False)
+    print("web model %s: %d triangles, %d KB" % (out, tris, os.path.getsize(out) // 1024))
+
+
 # ================================================================ assembly + exports
 root = link(bpy.data.objects.new("GRAZR_DP501", None))
 for o in list(col.objects):
@@ -703,6 +789,9 @@ for o in list(col.objects):
 root.scale = (0.001, 0.001, 0.001)
 bpy.context.view_layer.update()
 print("axis meets the sole at X=%.1f (heel end 53 -> %.1f mm), club length %.0f" % (P0.x, 53 - P0.x, CLUB_LEN))
+if WEB:
+    web_export()
+    sys.exit(0)
 bpy.ops.file.pack_all()
 if not (os.environ.get("BRASS") or os.environ.get("GLIT")):   # a calibration build is not the model: keep the file
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, "dp501_parkgolf.blend"))
@@ -787,7 +876,9 @@ def look(loc, target, up=(0, 0, 1)):
 
 
 def shot(name, loc, target, lens, lights, up=(0, 0, 1), head_only=False, res=(1600, 1200), folder="renders",
-         ortho=None, bg=0.93):
+         ortho=None, bg=0.93, shift=(0.0, 0.0), glow=(0.5, 0.42)):
+    """shift: lens shift (fractions of the larger image side; +x moves the picture left). glow: centre of the
+    faint backdrop glow in dark shots (fractions of width / height from the top left)."""
     only = os.environ.get("ONLY")
     if only and name not in only.split(","):
         return
@@ -802,6 +893,7 @@ def shot(name, loc, target, lens, lights, up=(0, 0, 1), head_only=False, res=(16
     else:
         cam_data.type = "PERSP"
         cam_data.lens = lens
+    cam_data.shift_x, cam_data.shift_y = shift
     for o in [o for o in col.objects if o.type == "LIGHT"]:
         bpy.data.objects.remove(o, do_unlink=True)
     for li in lights:
@@ -817,7 +909,7 @@ def shot(name, loc, target, lens, lights, up=(0, 0, 1), head_only=False, res=(16
     if bg < 0.5:                              # dark studio: a faint glow behind the club, black towards the edges
         W, H = res
         k = np.arange(len(px))
-        gx, gy = (k % W) / W - 0.5, (k // W) / H - 0.42
+        gx, gy = (k % W) / W - glow[0], (k // W) / H - glow[1]
         back += 0.035 * np.clip(1.0 - (gx * gx + gy * gy) / 0.22, 0, None)[:, None]
     px[:, :3] = px[:, :3] * a + back * (1 - a)
     px[:, 3] = 1.0
@@ -919,10 +1011,14 @@ if SITE:
         ("strip", c + Vector((0.55, -0.20, 0.25)) * d, c, 0.12 * d, 3.5),
         ("low", c + Vector((-0.10, -0.30, -0.36)) * d, c, 0.6 * d, 1.5, (1.0, 0.92, 0.8)),
     ]
-    shot("hero", HC + Vector((-0.30, -0.24, 0.13)), HC + Vector((0.035, 0.01, 0.010)), 70, key(HC), res=(1920, 1080),
-         **dark)
-    shot("hero_m", HC + Vector((-0.22, -0.30, 0.16)), HC + Vector((0.0, 0.0, 0.03)), 60, key(HC), res=(1080, 1350),
-         **dark)
+    # hero: whole head right of centre and above the middle (the page copy sits bottom left over the dark)
+    d_h = Vector((-0.30, -0.24, 0.13)).normalized()
+    shot("hero", HC + d_h * 0.58, HC + mm(0, 0, 4), 70, key(HC),
+         res=(1920, 1080), shift=(-0.10, -0.03), glow=(0.60, 0.42), **dark)
+    # phones crop the 4:5 picture to its middle: head centred, upper half, copy below
+    d_m = Vector((-0.22, -0.30, 0.16)).normalized()
+    shot("hero_m", HC + d_m * 0.52, HC + mm(0, 0, 4), 60, key(HC),
+         res=(1080, 1350), shift=(0.045, -0.10), glow=(0.5, 0.36), **dark)
     mid = axis(430) * 0.001
     full_l = [("key", mid + Vector((-0.8, -1.5, 1.2)), mid, 1.0, 70), ("rim", mid + Vector((0.6, 1.2, 0.8)), mid, 0.8, 60),
               ("rim2", mid + Vector((-1.0, 0.8, 0.3)), mid, 0.8, 35)]
@@ -930,15 +1026,24 @@ if SITE:
     shot("card", HC + Vector((-0.26, -0.28, 0.30)), HC + Vector((0.01, 0.0, 0.05)), 50, key(HC), res=(1200, 1500),
          **dark)
     back_c = mm(0, 84, 26)
-    shot("f_brass", back_c + Vector((0.16, 0.24, 0.10)), back_c, 85, key(back_c, 0.6), res=(1280, 960),
-         head_only=True, **dark)
-    shot("f_maple", HC + Vector((0.40, -0.10, 0.06)), HC, 85, key(HC), res=(1280, 960), head_only=True, **dark)
+    # brass weight from behind the heel: soft lights so the glossy crown does not flare, shaft kept
+    soft = [("key", back_c + Vector((-0.20, 0.10, 0.32)), back_c, 0.45, 7.0),
+            ("fill", back_c + Vector((0.32, 0.12, 0.04)), back_c, 0.35, 3.0),
+            ("rim", back_c + Vector((0.05, -0.30, 0.22)), back_c, 0.25, 5.0),
+            ("low", back_c + Vector((-0.05, 0.25, -0.25)), back_c, 0.5, 1.2, (1.0, 0.92, 0.8))]
+    shot("f_brass", back_c + Vector((0.12, 0.36, 0.11)), back_c + mm(0, -10, 0), 85, soft, res=(1280, 960),
+         shift=(-0.08, 0.06), glow=(0.5, 0.5), **dark)
+    shot("f_maple", HC + Vector((0.40, -0.10, 0.06)), HC, 85, key(HC), res=(1280, 960), **dark)
     sc = axis(WRAP[0] + 125) * 0.001
     shot("f_shaft", sc + Vector(FRONT) * 0.30 + mm(0, -40, 0), sc, 85, key(sc, 0.5), up=tuple(D), res=(1280, 960),
          **dark)
     shot("f_aim", HC + Vector((0.10, 0.05, 0.38)), HC, 70, key(HC), up=(-1, 0, 0), res=(1280, 960), **dark)
-    shot("poster", HC + Vector((-0.30, -0.26, 0.20)), HC + Vector((0.0, 0.0, 0.03)), 60, key(HC), res=(1280, 720),
-         **dark)
+    # 3D viewer poster = the viewer's first view (website dp501.html: camera-target 0m 0.038m -0.046m,
+    # camera-orbit -40deg 68deg 0.44m, field-of-view 25deg vertical), so nothing jumps when the model loads
+    th, ph = math.radians(-40.0), math.radians(68.0)
+    pv = Vector((math.sin(ph) * math.sin(th), -math.sin(ph) * math.cos(th), math.cos(ph)))   # glTF -> Blender
+    shot("poster", HC + mm(0, 0, 10) + pv * 0.44, HC + mm(0, 0, 10), 20.25 / 2 / math.tan(math.radians(12.5)),
+         key(HC), res=(1280, 720), glow=(0.5, 0.5), **dark)
     print("done")
     sys.exit(0)
 

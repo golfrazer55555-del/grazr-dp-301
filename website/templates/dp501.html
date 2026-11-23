@@ -71,7 +71,9 @@
       <h2 class="h2">{{ p.v3d_title }}</h2>
       <p class="body">{{ t.v3d_text }}</p>
     </header>
-    <div class="viewer" data-viewer data-src="/media/3d/dp501.glb" data-alt="GRAZR DP-501 3D" data-ar="{{ t.v3d_ar }}">
+    <div class="viewer" data-viewer data-src="/media/3d/dp501.glb" data-alt="GRAZR DP-501 3D" data-ar="{{ t.v3d_ar }}"
+         data-target="0m 0.038m -0.046m" data-orbit="-40deg 68deg 0.44m" data-orbit-portrait="-40deg 68deg 0.62m"
+         data-fov="25deg">
       <img class="viewer-poster" src="/media/dp501/poster.webp" alt="" loading="lazy" width="1280" height="720">
       <div class="viewer-cta">
         <button class="btn btn-primary" type="button" data-viewer-load data-loading="{{ t.v3d_loading }}">
