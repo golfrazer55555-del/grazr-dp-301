@@ -634,7 +634,7 @@ tb = tex(nt, img("grip_bump.png", False), extension="REPEAT")
 nt.links.new(ta.outputs["Color"], b.inputs["Base Color"])
 b.inputs["Roughness"].default_value = 0.62
 b.inputs["Specular IOR Level"].default_value = 0.35
-bp = node(nt, "ShaderNodeBump", Strength=0.9, Distance=0.0011)
+bp = node(nt, "ShaderNodeBump", Strength=1.2, Distance=0.0011)
 nt.links.new(tb.outputs["Color"], bp.inputs["Height"])
 nt.links.new(bp.outputs["Normal"], b.inputs["Normal"])
 M_GRIP = m
