@@ -881,7 +881,7 @@ if MATCH:
             bpy.data.objects.remove(o, do_unlink=True)
         for li in lights:
             area(*li)
-        path = os.path.join(HERE, "check", "match_%s.png" % name)
+        path = os.path.join(os.environ.get("MATCH_DIR", os.path.join(HERE, "check")), "match_%s.png" % name)
         scene.render.filepath = path
         bpy.ops.render.render(write_still=True)
         print("  ->", path, flush=True)
