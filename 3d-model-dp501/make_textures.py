@@ -252,11 +252,11 @@ def sole(ppm=15):
     dp_im = Image.fromarray((dp * 255).astype(np.uint8))
     place(blk, dp_im, org, ((398 + 585) / 2 - 491) / 6.55, ((610 + 656) / 2 - 170) / 6.55,
           w_mm=(585 - 398) / 6.55, h_mm=(656 - 610) / 6.55, ppm=ppm)
-    # screws: thin outlines
+    # screws: present on the real sole but barely outlined (owner): a fine, faint line
     d = ImageDraw.Draw(rings)
     for X, Y in ((-41, 14), (41, 14), (-37.5, 47), (37.5, 47), (0, 84.3)):
         cx, cy, rr = (X + 53) * ppm, Y * ppm, 1.8 * ppm
-        d.ellipse([cx - rr, cy - rr, cx + rr, cy + rr], outline=255, width=max(2, int(0.28 * ppm)))
+        d.ellipse([cx - rr, cy - rr, cx + rr, cy + rr], outline=255, width=2)     # fine line, no strong outline
     eng.save(os.path.join(TEX, "sole_engrave.png"))
     blk.save(os.path.join(TEX, "sole_black.png"))
     rings.save(os.path.join(TEX, "sole_rings.png"))
@@ -385,20 +385,24 @@ def grip():
 
 # ------------------------------------------------------------------ carbon weave tile
 def carbon(n=1024):
-    """2 x 2 cells of a plain weave (one tile = 4.2 mm). R = 1 where the tow runs along X (warp on top),
-    G = tow height (rounded bundles, dip at the crossings), B = fibre streaks along each tow."""
+    """2 x 2 cells of a plain weave (one tile = 4.3 mm, measured on the face photo: 2.15 mm tows). Crisp, flat-topped
+    tows as on the real face (not rounded pillows): R = 1 where the tow runs along X (on top), G = tow height (flat
+    top, short drop at its sides and where it dives under the crossing tow), B = fibre streaks along each tow."""
     y, x = np.mgrid[0:n, 0:n].astype(np.float32) / n * 2.0       # cell units
     cx, cy = np.floor(x), np.floor(y)
-    warp = ((cx + cy) % 2) == 0                                     # warp (along X) on top in these cells
+    warp = ((cx + cy) % 2) == 0                                     # tow along X on top in these cells
     fx, fy = x - cx, y - cy
     across = np.where(warp, fy, fx)                                 # position across the tow
     along = np.where(warp, fx, fy)
-    hump = np.sin(np.pi * np.clip(across, 0, 1)) ** 0.5
-    dip = 1 - 0.35 * (np.cos(np.pi * (along - 0.5)) ** 8 * 0 + (1 - np.sin(np.pi * along) ** 0.4))
-    height = hump * dip
+    edge = lambda u, w: np.clip(np.minimum(u, 1 - u) / w, 0, 1)    # 0 at the cell border -> 1 inside
+    side = edge(across, 0.10)
+    side = side * side * (3 - 2 * side)
+    end = edge(along, 0.16)
+    end = 0.55 + 0.45 * end * end * (3 - 2 * end)
+    height = side * end
     rng = np.random.default_rng(501)
-    streak_x = ndimage.gaussian_filter1d(rng.random(n * 4).astype(np.float32), 1.2)[:n]
-    streak_y = ndimage.gaussian_filter1d(rng.random(n * 4).astype(np.float32), 1.2)[n:2 * n]
+    streak_x = ndimage.gaussian_filter1d(rng.random(n * 4).astype(np.float32), 1.0)[:n]
+    streak_y = ndimage.gaussian_filter1d(rng.random(n * 4).astype(np.float32), 1.0)[n:2 * n]
     streak = np.where(warp, streak_y[(y / 2 * n).astype(int) % n], streak_x[(x / 2 * n).astype(int) % n])
     streak = (streak - streak.min()) / (streak.max() - streak.min())
     out = np.dstack([warp.astype(np.float32), np.clip(height, 0, 1), streak])

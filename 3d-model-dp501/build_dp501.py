@@ -31,349 +31,59 @@ TEX = os.path.join(HERE, "textures")
 RENDER = "--no-render" not in sys.argv
 ORTHO = "--ortho" in sys.argv
 SITE = "--site" in sys.argv               # dark-studio stills for the website (site/) instead of the approval set
+PHOTO = "--photo" in sys.argv             # views matching the owner's photos (check/photo_*.png) for side-by-side checks
 SAMPLES = int(os.environ.get("SAMPLES", "128"))
 
-# ================================================================ measured shape (SPEC.md)
-HEAD_W, HEAD_D, HEAD_H = 106.0, 95.0, 56.0
-FACE_T = 8.0
-NOSE_Y = 81.0
-BRASS_Z0, BRASS_Z1 = 17.5, 19.5          # brass / lacquer line on the sides at Y = FACE_T and Y = NOSE_Y
+# ================================================================ measured shape (SPEC.md; the head is dp501_shape.py)
+sys.path.insert(0, HERE)
+import dp501_shape as S  # noqa: E402
+
+HEAD_W, HEAD_D, HEAD_H = S.HEAD_W, S.HEAD_D, S.HEAD_H
+FACE_T, NOSE_Y, TIP_Y = S.FACE_T, S.NOSE_Y, S.TIP_Y
 K_Y = 95.0 / 94.4                        # side drawing length -> top drawing length
+half_width = S.half_width
 
-# top-view outline: the measured points of the top and bottom drawings fit a superellipse behind Y = 26
-# (rms 0.13 mm, max 0.4 mm), so the smooth curve is used instead of the noisy points
-SE_Y0, SE_N, SE_M = 26.19, 1.592, 1.6
-CORNER_R = 1.0                                # small vertical round on the face plate corners
-K_Y = 95.0 / 94.4                            # side drawing length -> top drawing length
+# brass pins in the face, measured on the owner's face photo (face 106 mm wide = 1440 px): x, z
+PINS = [(-23.7, 41.9), (23.7, 41.9), (-33.0, 13.5), (33.0, 13.5)]
+PIN_R = 3.3
 
-
-def _se_xy(th):
-    return 53.0 * np.cos(th) ** (2 / SE_N), SE_Y0 + (HEAD_D - SE_Y0) * np.sin(th) ** (2 / SE_M)
-
-
-# Nose: behind Y 84 the superellipse (whose own end is a point) hands over, matching value, slope and curvature, to
-# w^2 = 2 rho e + a e^2 + b e^3 + c e^4 (e = 95 - Y), fitted to the top drawing's nose (max 0.21 mm): a round tip
-# of radius rho = 14.6 mm, as drawn.
-NOSE_B = 84.0
-NOSE_P = (14.55217, 1.91438, -0.06561, 0.00076)
-TIP_Y = HEAD_D                                               # back end of the head
-
-
-def _nose_w(y):
-    e = np.clip(HEAD_D - np.asarray(y, float), 0, None)
-    return np.sqrt(np.clip(2 * NOSE_P[0] * e + NOSE_P[1] * e ** 2 + NOSE_P[2] * e ** 3 + NOSE_P[3] * e ** 4, 0, None))
-
-
-def _hw_core(y):
-    """Half width of the top-view outline without the face plate's corner round (the distance field uses this)."""
-    y = np.asarray(y, float)
-    t = np.clip((y - SE_Y0) / (HEAD_D - SE_Y0), 0, 1)
-    w = 53.0 * np.clip(1 - t ** SE_M, 0, 1) ** (1 / SE_N)
-    return np.where(y > NOSE_B, _nose_w(y), w)
-
-
-def half_width(y):
-    """Half width of the top-view outline, with the small vertical round on the face plate's corners."""
-    y = np.asarray(y, float)
-    corner = 53.0 - CORNER_R + np.sqrt(np.clip(CORNER_R ** 2 - (CORNER_R - y) ** 2, 0, None))
-    return np.where(y < CORNER_R, corner, _hw_core(y))
-
-
-def corner_squash(y):
-    """The face plate corner round squeezes the section sideways (like the front round squeezes it vertically):
-    a point at x is shaped like the point x * k on the full-width section. Returns k and dk/dy."""
-    y = np.asarray(y, float)
-    ratio = lambda v: 53.0 / half_width(np.minimum(v, CORNER_R))          # the core width is 53 at the face
-    h = 1e-5
-    yl, yh = np.maximum(y - h, 0.0), y + h
-    near = y < CORNER_R
-    return np.where(near, ratio(y), 1.0), np.where(near, (ratio(yh) - ratio(yl)) / (yh - yl), 0.0)
-
-
-# Side silhouettes, measured column by column on the heel-side drawing (red arrow masked out; the drawing's stroke
-# edges at 0.16 / 55.93 mm mapped to the sole 0 and the KSPO height 56):
-#   top    cubic spline through the smoothed drawing line (rms 0.024 mm), flat 56 to Y 48
-#   bottom flat sole, soft bend at Y 42.7, then a slightly curving 21-25 deg rise (rms 0.04 mm behind Y 48)
-#   back   straight 77.5 deg face (rms 0.05 mm)
-#   corners rounded with r 2.8 (nose tip) and r 3.5 (rise -> back face), fitted to the drawing (rms 0.05 mm)
-TOP_KNOTS = [(44.0, 56.0), (46.0, 56.0), (48.0, 56.0), (50.0, 55.995), (52.0, 55.884), (54.0, 55.669),
-             (56.0, 55.425), (58.0, 55.168), (60.0, 54.898), (62.0, 54.615), (64.0, 54.32), (66.0, 54.006),
-             (68.0, 53.674), (70.0, 53.355), (72.0, 53.01), (74.0, 52.636), (76.0, 52.25), (78.0, 51.846),
-             (80.0, 51.421), (82.0, 50.968), (84.0, 50.478), (86.0, 49.947), (88.0, 49.36), (90.0, 48.69),
-             (92.0, 47.846), (94.0, 46.663), (94.4, 46.397)]
-_tk = np.array(TOP_KNOTS)
-_tcs = CubicSpline(_tk[:, 0], _tk[:, 1], bc_type=((1, 0.0), "not-a-knot"))
-BACK_A, BACK_B = 85.1682, 0.22037            # back face: Y = A + B Z
-TIP_RT, TIP_RB = 2.8, 3.5                    # nose tip round / round where the sole rise meets the back face
-
-
-def _top_line(y):
-    y = np.asarray(y, float)
-    return np.where(y < 44.0, 56.0, _tcs(np.clip(y, 44.0, None)))
-
-
-def _bot_line(y, k=0.6):
-    y = np.asarray(y, float)
-    return k * np.logaddexp(0.0, (0.39580 * (y - 60.0) + 6.3724 + 0.001150 * (y - 60.0) ** 2) / k)
-
-
-def _fillet(f, r, y_lo, y_hi, below):
-    """Circle of radius r tangent to the curve z = f(y) (centre below it if `below`) and in front of the back face.
-    Returns the centre and the two tangent points (on the curve, on the back face)."""
-    def centre(ya):
-        sl = (f(ya + 1e-5) - f(ya - 1e-5)) / 2e-5
-        n = np.array([-sl, 1.0]) / np.hypot(sl, 1.0)
-        return np.array([ya, float(f(ya))]) + (-r if below else r) * n
-
-    def gap(ya):
-        c = centre(ya)
-        return (c[0] - (BACK_A + BACK_B * c[1])) / np.hypot(1.0, BACK_B) + r
-    ya = brentq(gap, y_lo, y_hi)
-    c = centre(ya)
-    nb = np.array([1.0, -BACK_B]) / np.hypot(1.0, BACK_B)
-    return c, np.array([ya, float(f(ya))]), c - (gap(ya) - r) * nb
-
-
-_CT, _PT_TOP, _PT_BACK = _fillet(_top_line, TIP_RT, 85.0, 96.0, True)
-_CB, _PB_BOT, _PB_BACK = _fillet(_bot_line, TIP_RB, 80.0, 92.0, False)
-SIDE_TIP_Y = float(_CT[0] + TIP_RT)          # 94.92 on the drawing; scaled onto the outline's tip below
-TIP_Z = float(_CT[1])                        # 44.5: height of the nose tip
-
-
-def _side_top(Y):
-    arc = _CT[1] + np.sqrt(np.clip(TIP_RT ** 2 - (Y - _CT[0]) ** 2, 0, None))
-    return np.where(Y < _PT_TOP[0], _top_line(Y), arc)
-
-
-def _side_bot(Y):
-    z = _bot_line(Y)
-    z = np.where(Y > _PB_BOT[0], _CB[1] - np.sqrt(np.clip(TIP_RB ** 2 - (Y - _CB[0]) ** 2, 0, None)), z)
-    z = np.where(Y > _PB_BACK[0], (Y - BACK_A) / BACK_B, z)
-    return np.where(Y > _PT_BACK[0], _CT[1] - np.sqrt(np.clip(TIP_RT ** 2 - (Y - _CT[0]) ** 2, 0, None)), z)
-
-
-# front cross-section half profile (x, z): top round, outward-leaning wall, lower curve, flat sole
-TOP_PROFILE = [(0, 56.0), (25.0, 56.0), (27.0, 55.92), (31.0, 55.4), (35.0, 54.5), (38.5, 53.3), (41.5, 51.9),
-               (44.2, 50.2), (46.6, 48.4), (48.8, 46.5), (50.6, 44.6), (51.9, 42.8), (52.7, 41.3), (53.0, 40.0)]
-BOT_PROFILE = [(0, 0.0), (20.0, 0.0), (22.5, 0.15), (25.0, 0.6), (27.5, 1.3), (30.0, 2.1), (32.5, 3.0),
-               (35.0, 4.1), (37.5, 5.3), (40.0, 6.7), (42.5, 8.2), (44.5, 9.6), (46.3, 11.0), (47.7, 12.4),
-               (48.6, 13.6), (49.0, 14.5), (49.6, 16.5), (50.4, 20.0), (51.2, 24.0), (51.8, 28.0), (52.4, 32.0),
-               (52.8, 36.0), (53.0, 40.0)]
-EDGE_Z = 40.0
-PINS = [(-21.0, 48.6), (21.0, 48.6), (-29.4, 14.3), (29.4, 14.3)]
-PIN_R = 3.15
-
-# shaft / ferrule / grip
+# shaft / ferrule / grip (owner's measurements: grip 280, shaft 500 between ferrule and grip, ferrule 15 / 10 mm
+# along the shaft on its long (toe) / short (heel) side; with the head these add up to the 850 mm club length)
 HOLE = (12.9, 30.1)                      # where the shaft axis leaves the head top
 LIE = math.radians(75.0)
 CLUB_LEN = 850.0
-GRIP_LEN = 350.0
-FERRULE_R, FERRULE_H = 9.2, 11.0         # visible height, measured vertically at the side
-BAND_C, BAND_H = 6.5, 2.1                # holographic band centre / height above the head top (vertical)
+GRIP_LEN = 280.0
+FERRULE_R, FERRULE_LEN = 9.2, 12.5       # ferrule length along the axis at its centre line
+BAND_FROM_TOP, BAND_H = 4.5, 2.1         # holographic band: centre 4.5 mm below the ferrule top, 2.1 mm wide
 SHAFT_R0, SHAFT_R1 = 8.0, 9.75           # at the ferrule / under the grip
 WRAP = (200.0, 450.0)                    # shaft graphic band, distance along the axis from the sole plane
+SEAM = 0.16                              # glue line between the carbon face plate and the maple body
 
 
-def pchip(tab):
-    xs, ys = zip(*tab)
-    f = PchipInterpolator(np.array(xs, float), np.array(ys, float), extrapolate=True)
-    return lambda x: f(np.clip(x, xs[0], xs[-1]))
-
-
-FRONT_R = 1.0                                 # small round on the face plate's top / bottom front edges
-
-
-def _front_round(y):
-    y = np.asarray(y, float)
-    return np.where(y < FRONT_R, FRONT_R - np.sqrt(np.clip(FRONT_R ** 2 - (FRONT_R - y) ** 2, 0, None)), 0.0)
-
-
-_KS = SIDE_TIP_Y / TIP_Y
-s_top = lambda y: _side_top(np.clip(np.asarray(y, float) * _KS, 0, SIDE_TIP_Y)) - _front_round(y)
-s_bot = lambda y: _side_bot(np.clip(np.asarray(y, float) * _KS, 0, SIDE_TIP_Y)) + _front_round(y)
-_top = pchip(TOP_PROFILE)
-_bot = pchip(BOT_PROFILE)
-# The profile points are joined by PCHIP, which is only C1: its curvature jumps at every point and that shows
-# as wavy edges in the lacquer reflections. Both curves leave the outline vertically (height ~ sqrt(d)), so they
-# are smoothed in r = sqrt(d) with an odd extension through r = 0: U(0) = L(0) = 0 and the top and the wall still
-# meet tangentially at the outline, while the curvature is evened out (about 0.3 mm near the edge, 1.5 mm inside).
-from scipy.ndimage import gaussian_filter1d  # noqa: E402
-_RR = np.arange(-7.5, 7.5001, 0.002)
-_rd = np.clip(_RR ** 2, 0, 53.0)
-_U_tab = gaussian_filter1d(np.sign(_RR) * (_top(53.0 - _rd) - EDGE_Z), 75.0, mode="nearest")
-_L_tab = gaussian_filter1d(np.sign(_RR) * (EDGE_Z - _bot(53.0 - _rd)), 75.0, mode="nearest")
-U = lambda d: np.interp(np.sqrt(np.clip(d, 0, 53.0)), _RR, _U_tab)   # height of the top above the edge line
-L = lambda d: np.interp(np.sqrt(np.clip(d, 0, 53.0)), _RR, _L_tab)   # depth of the bottom below the edge line
-
-# outline (toe side -> tip -> heel side, the face edge left out), sampled densely
-_th = np.linspace(0, np.arcsin(((NOSE_B - SE_Y0) / (HEAD_D - SE_Y0)) ** (SE_M / 2)), 6000)
-_w, _y = _se_xy(_th)
-_u = np.linspace(np.sqrt(HEAD_D - NOSE_B), 0, 3000)[1:] ** 2      # nose: denser towards the tip
-_w = np.concatenate([_w, _nose_w(HEAD_D - _u)])
-_y = np.concatenate([_y, HEAD_D - _u])
-_yc = np.linspace(0, SE_Y0, 2000)
-heel = np.concatenate([np.stack([_hw_core(_yc), _yc], 1), np.stack([_w, _y], 1)])
-outline = np.concatenate([heel * [-1, 1], heel[::-1][1:]])
-TREE = cKDTree(outline)
-
-# signed distance on a 0.1 mm grid, mirrored at the face plane, blurred (sigma 2 mm): the rounds keep their
-# exact size near the outline, while the crease the plain distance has along the centre line at the back is
-# smoothed out (otherwise it shows as a kinked ridge and lumpy reflections)
-GX = np.arange(-58.0, 58.0001, 0.1)
-GY = np.arange(-6.0, 100.0001, 0.1)
-_XX, _YY = np.meshgrid(GX, GY, indexing="ij")
-_ay = np.abs(_YY)
-_d = TREE.query(np.stack([_XX.ravel(), _ay.ravel()], 1))[0].reshape(_XX.shape)
-_inside = (np.abs(_XX) <= _hw_core(np.minimum(_ay, TIP_Y))) & (_ay <= TIP_Y)
-from scipy.ndimage import gaussian_filter, map_coordinates, spline_filter  # noqa: E402
-SDF = spline_filter(gaussian_filter(np.where(_inside, _d, -_d), sigma=25.0), order=3)   # cubic: smooth normals
-
-
-_OL = outline[np.r_[True, np.hypot(*np.diff(outline, axis=0).T) > 1e-9]]   # drop repeated points (zero segments)
-_SA = _OL[:-1]
-_SD = _OL[1:] - _SA
-_SL2 = (_SD ** 2).sum(1)
-_SN = np.stack([_SD[:, 1], -_SD[:, 0]], 1) / np.sqrt(_SL2)[:, None]      # inward unit normal of each segment
-_OL_TREE = cKDTree(_OL)
-
-
-def poly_dist(x, y):
-    """Distance to the outline polyline itself (not to its samples), so it is smooth in x and y, and its gradient
-    (unit vector pointing inside, away from the nearest outline point)."""
-    p = np.stack([x, np.abs(y)], 1)
-    _, idx = _OL_TREE.query(p, k=2)
-    best = np.full(len(p), np.inf)
-    grad = np.zeros((len(p), 2))
-    for k in range(2):
-        for off in (-1, 0):
-            i = np.clip(idx[:, k] + off, 0, len(_SA) - 1)
-            t = np.clip(((p - _SA[i]) * _SD[i]).sum(1) / _SL2[i], 0, 1)
-            v = p - (_SA[i] + t[:, None] * _SD[i])
-            dd = np.hypot(v[:, 0], v[:, 1])
-            # points on the outline or a hair outside it (the true curve bulges past the polyline's chords): the
-            # outline's own inward normal, never the reversed direction from the nearest point
-            on = (v * _SN[i]).sum(1) < 1e-6
-            g = np.where(on[:, None], _SN[i], v / np.maximum(dd, 1e-12)[:, None])
-            dd = np.where(on, 0.0, dd)
-            better = dd < best
-            best = np.where(better, dd, best)
-            grad = np.where(better[:, None], g, grad)
-    grad[:, 1] *= np.where(np.asarray(y) < 0, -1.0, 1.0)
-    return best, grad
-
-
-def dist(x, y):
-    """Exact distance to the outline near it (keeps the rounds and the nose tip true); the blurred field only
-    takes over deeper inside (from 3 to 8 mm), where it smooths the centre-line crease."""
-    x = np.ravel(np.asarray(x, float))
-    y = np.ravel(np.asarray(y, float))
-    dt = poly_dist(x, y)[0]
-    db = map_coordinates(SDF, [(x - GX[0]) / 0.1, (y - GY[0]) / 0.1], order=3, mode="nearest", prefilter=False)
-    w = np.clip((dt - 3.0) / 5.0, 0, 1)
-    w = w * w * (3 - 2 * w)
-    return dt * (1 - w) + np.minimum(db, dt) * w
-
-
-def dist_grad(x, y):
-    """Gradient of dist(): exact near the outline (where dist is the plain distance), central differences inside."""
-    x = np.ravel(np.asarray(x, float))
-    y = np.ravel(np.asarray(y, float))
-    dt, g = poly_dist(x, y)
-    deep = dt > 2.9
-    if deep.any():
-        h = 0.01
-        xd, yd = x[deep], y[deep]
-        g[deep, 0] = (dist(xd + h, yd) - dist(xd - h, yd)) / (2 * h)
-        g[deep, 1] = (dist(xd, yd + h) - dist(xd, yd - h)) / (2 * h)
-    return g
-
-
-def _row_raw(y):
-    y = np.ravel(np.asarray(y, float))
-    dm = dist(np.zeros_like(y), y)
-    st, sb = s_top(y), s_bot(y)
-    um, lm = U(dm), L(dm)
-    return st - um * (st - sb) / np.maximum(um + lm, 1e-9), st, sb, um, lm
-
-
-def _hermite5(y, y0, y1, p0, d0, a0, p1, d1, a1):
-    """Quintic Hermite: value, slope and curvature given at both ends (so the join is C2)."""
-    h = y1 - y0
-    t = (np.asarray(y, float) - y0) / h
-    return ((1 - 10 * t ** 3 + 15 * t ** 4 - 6 * t ** 5) * p0 + (t - 6 * t ** 3 + 8 * t ** 4 - 3 * t ** 5) * h * d0
-            + (0.5 * t ** 2 - 1.5 * t ** 3 + 1.5 * t ** 4 - 0.5 * t ** 5) * h * h * a0
-            + (10 * t ** 3 - 15 * t ** 4 + 6 * t ** 5) * p1 + (-4 * t ** 3 + 7 * t ** 4 - 3 * t ** 5) * h * d1
-            + (0.5 * t ** 3 - t ** 4 + 0.5 * t ** 5) * h * h * a1)
-
-
-RIDGE_Y0, RIDGE_K_END = 88.0, 0.2
-_c3 = _row_raw(np.array([RIDGE_Y0 - 0.01, RIDGE_Y0, RIDGE_Y0 + 0.01]))[0]
-_RIDGE = (RIDGE_Y0, TIP_Y, _c3[1], (_c3[2] - _c3[0]) / 0.02, (_c3[2] - 2 * _c3[1] + _c3[0]) / 1e-4,
-          TIP_Z, RIDGE_K_END, 0.0)
-
-
-def row_scale(y):
-    """Edge-line (ridge) height c and the scales of the profile's top part (st) and bottom part (sb) for the
-    section at y; the section's centre reaches the side drawing's top and bottom silhouettes. Up to Y 88 both parts
-    share one scale (the measured front section, shifted and scaled). Behind it the ridge follows a smooth curve
-    rising to the nose tip and the two parts are scaled apart: with one scale the drawing's rounded tip would put a
-    dip into the ridge right at the tip."""
-    c, st, sb, um, lm = _row_raw(y)
-    y = np.ravel(np.asarray(y, float))
-    c = np.where(y > RIDGE_Y0, _hermite5(np.clip(y, RIDGE_Y0, TIP_Y), *_RIDGE), c)
-    s_t = (st - c) / np.maximum(um, 1e-9)
-    s_b = (c - sb) / np.maximum(lm, 1e-9)
-    if _TIP_S is not None:
-        # towards the tip the scales level off smoothly instead of chasing the drawing's tip round exactly (its
-        # circle and the section's profile differ in shape right at the tip, which would wrinkle the surface): the
-        # nose top stays concave and within 0.27 mm of the drawing, the back face within 0.07 mm
-        (yt0, st_end, t3), (yb0, sb_end, b3) = _TIP_S
-        s_t = np.where(y > yt0, _hermite5(np.clip(y, yt0, TIP_Y), yt0, TIP_Y, *t3, st_end, 0.0, 0.0), s_t)
-        s_b = np.where(y > yb0, _hermite5(np.clip(y, yb0, TIP_Y), yb0, TIP_Y, *b3, sb_end, 0.0, 0.0), s_b)
-    return c, s_t, s_b
-
-
-def _jet(y0, i):
-    """Value, slope and curvature of the raw scale i (1 top, 2 bottom) at y0."""
-    v = row_scale(np.array([y0 - 0.01, y0, y0 + 0.01]))[i]
-    return v[1], (v[2] - v[0]) / 0.02, (v[2] - 2 * v[1] + v[0]) / 1e-4
-
-
-_TIP_S = None
-_TIP_S = ((92.0, 0.865, _jet(92.0, 1)), (94.0, 0.308, _jet(94.0, 2)))
-
-
-_Ur_tab = np.gradient(_U_tab, _RR)
-_Lr_tab = np.gradient(_L_tab, _RR)
-
-
-def surface_normals(p):
-    """Analytic outward normals of the head surface at points p (n, 3) lying on it (top part where z >= the
-    edge line, bottom part below). Written in r = sqrt(d), so they stay finite at the outline, where the top and
-    the wall meet with a vertical tangent (both give the outline's outward normal there)."""
-    x, y, z = p[:, 0], p[:, 1], p[:, 2]
-    k, dk = corner_squash(y)
-    d = np.clip(dist(x * k, y), 0, 53.0)
-    g0 = dist_grad(x * k, y)
-    g = np.stack([g0[:, 0] * k, g0[:, 1] + g0[:, 0] * x * dk], 1)       # chain rule through the sideways squeeze
-    r = np.sqrt(d)
-    c, st, sb = row_scale(y)
-    h = np.minimum(0.004, np.maximum(y, 1e-4) * 0.5)
-    lo = np.maximum(y - h, 0.0)
-    hi = np.minimum(y + h, TIP_Y - 0.004)
-    c1, st1, sb1 = row_scale(hi)
-    c0, st0, sb0 = row_scale(lo)
-    dy = np.maximum(hi - lo, 1e-9)
-    dc, dst, dsb = (c1 - c0) / dy, (st1 - st0) / dy, (sb1 - sb0) / dy
-    u, ur = np.interp(r, _RR, _U_tab), np.interp(r, _RR, _Ur_tab)
-    l_, lr = np.interp(r, _RR, _L_tab), np.interp(r, _RR, _Lr_tab)
-    top = z >= c - 1e-6
-    n = np.where(top[:, None],
-                 np.stack([-st * ur * g[:, 0], -2 * r * (dc + u * dst) - st * ur * g[:, 1], 2 * r], 1),
-                 np.stack([-sb * lr * g[:, 0], 2 * r * (dc - l_ * dsb) - sb * lr * g[:, 1], -2 * r], 1))
-    on_edge = d < 1e-6                       # on the outline itself (and the nose tip): the outline's outward normal
-    n[on_edge] = np.stack([-g[on_edge, 0], -g[on_edge, 1], np.zeros(on_edge.sum())], 1)
-    n[y < 1e-6] = (0.0, -1.0, 0.0)           # the face plate's front edge rounds over to the face (vertical tangent)
+def head_normals(p, part):
+    """Outward normals at head vertices p (n, 3). part: 0 top surface, 1 bottom surface, 2 on the outline (corner
+    line), 3 the face plate's front edge row (y = 0), 4 the nose tip. Top / bottom normals come from central
+    differences of the surface functions (steps kept inside the outline), the outline's from the outline itself."""
+    x, y = p[:, 0], p[:, 1]
+    n = np.zeros_like(p)
+    for key, pid, sgn in (("zt", 0, 1.0), ("zb", 1, -1.0)):
+        m = part == pid
+        if not m.any():
+            continue
+        xm, ym = x[m], y[m]
+        d = S.surfaces(xm, ym)["d"]
+        h = np.clip(d / 4.0, 1e-5, 2e-3)
+        hy = np.minimum(h, ym / 2.0)
+        fx = (S.surfaces(xm + h, ym)[key] - S.surfaces(xm - h, ym)[key]) / (2 * h)
+        fy = (S.surfaces(xm, ym + hy)[key] - S.surfaces(xm, ym - hy)[key]) / (2 * hy)
+        n[m] = np.stack([-fx * sgn, -fy * sgn, np.full_like(fx, sgn)], 1)
+    m = part == 2
+    if m.any():
+        k, dk = S.corner_squash(y[m])
+        g = S.poly_dist(x[m] * k, y[m])[1]
+        n[m] = np.stack([-g[:, 0] * k, -(g[:, 1] + g[:, 0] * x[m] * dk), np.zeros(m.sum())], 1)
+    n[part == 3] = (0.0, -1.0, 0.0)
+    n[part == 4] = (0.0, 1.0, 0.0)
     return n / np.linalg.norm(n, axis=1, keepdims=True)
 
 
@@ -536,7 +246,7 @@ def brass(name, engraved=False, rough_range=(0.17, 0.25)):
         spark.feature = "F1"
         nt.links.new(coord.outputs["Object"], spark.inputs["Vector"])
         color = mix_rgb(nt, e.outputs["Color"], BRASS, (0.74, 0.46, 0.07, 1))   # sand-blasted: deeper, more yellow gold
-        color = mix_rgb(nt, r_.outputs["Color"], color, (0.18, 0.12, 0.05, 1))
+        color = mix_rgb(nt, r_.outputs["Color"], color, (0.60, 0.42, 0.13, 1))      # screws: faint line only
         color = mix_rgb(nt, k.outputs["Color"], color, (0.012, 0.012, 0.012, 1))
         sr = node(nt, "ShaderNodeMapRange", **{"To Min": 0.38, "To Max": 0.62})
         nt.links.new(spark.outputs["Distance"], sr.inputs["Value"])
@@ -578,23 +288,34 @@ def brass(name, engraved=False, rough_range=(0.17, 0.25)):
 
 
 def carbon_mat():
-    """Plain-weave carbon under clear coat: anisotropic per tow (warp along X, weft along Z), tile 4.2 mm."""
+    """Plain-weave carbon under clear coat, as on the real face: crisp 2.15 mm tows, the tows along X light and the
+    ones along Z dark (strong contrast), each with its own anisotropic sheen; tile 4.3 mm."""
     m, nt, b = principled("DP501_CarbonFace")
     t = tex(nt, img("carbon.png", False), "proj", "REPEAT")
     sep = nt.nodes.new("ShaderNodeSeparateColor")
     nt.links.new(t.outputs["Color"], sep.inputs[0])
     warp, height, streak = sep.outputs[0], sep.outputs[1], sep.outputs[2]
-    base_dark = (0.010, 0.010, 0.011, 1)
-    base_light = (0.07, 0.07, 0.074, 1)
-    hs = nt.nodes.new("ShaderNodeMath")
-    hs.operation = "MULTIPLY"
-    nt.links.new(height, hs.inputs[0])
-    sk = node(nt, "ShaderNodeMapRange", **{"To Min": 0.75, "To Max": 1.0})
+    tow = mix_rgb(nt, warp, (0.016, 0.016, 0.018, 1), (0.105, 0.105, 0.11, 1))   # along Z dark, along X light
+    shade = nt.nodes.new("ShaderNodeMath")
+    shade.operation = "MULTIPLY"
+    nt.links.new(height, shade.inputs[0])
+    sk = node(nt, "ShaderNodeMapRange", **{"To Min": 0.7, "To Max": 1.0})
     nt.links.new(streak, sk.inputs["Value"])
-    nt.links.new(sk.outputs["Result"], hs.inputs[1])
-    nt.links.new(mix_rgb(nt, hs.outputs[0], base_dark, base_light), b.inputs["Base Color"])
-    b.inputs["Metallic"].default_value = 0.65
-    b.inputs["Roughness"].default_value = 0.3
+    nt.links.new(sk.outputs["Result"], shade.inputs[1])
+    sh = node(nt, "ShaderNodeMapRange", **{"To Min": 0.35, "To Max": 1.0})
+    nt.links.new(shade.outputs[0], sh.inputs["Value"])
+    col = nt.nodes.new("ShaderNodeMix")
+    col.data_type = "RGBA"
+    col.blend_type = "MULTIPLY"
+    col.inputs["Factor"].default_value = 1.0
+    nt.links.new(tow, col.inputs[6])
+    gray = nt.nodes.new("ShaderNodeCombineColor")
+    for i in range(3):
+        nt.links.new(sh.outputs["Result"], gray.inputs[i])
+    nt.links.new(gray.outputs[0], col.inputs[7])
+    nt.links.new(col.outputs[2], b.inputs["Base Color"])
+    b.inputs["Metallic"].default_value = 0.6
+    nt.links.new(mix_f(nt, warp, 0.36, 0.24), b.inputs["Roughness"])
     b.inputs["Anisotropic"].default_value = 0.9
     tan = nt.nodes.new("ShaderNodeMix")
     tan.data_type = "VECTOR"
@@ -602,7 +323,7 @@ def carbon_mat():
     nt.links.new(world_vec(nt, (0, 0, 1)), tan.inputs[4])
     nt.links.new(world_vec(nt, (1, 0, 0)), tan.inputs[5])
     nt.links.new(tan.outputs[1], b.inputs["Tangent"])
-    bp = node(nt, "ShaderNodeBump", Strength=0.35, Distance=0.00015)
+    bp = node(nt, "ShaderNodeBump", Strength=0.5, Distance=0.00015)
     nt.links.new(height, bp.inputs["Height"])
     nt.links.new(bp.outputs["Normal"], b.inputs["Normal"])
     b.inputs["Coat Weight"].default_value = 1.0
@@ -651,49 +372,84 @@ M_PIN = brass("DP501_FacePin", rough_range=(0.32, 0.42))     # brushed like the 
 M_SEAM = simple("DP501_FacePlateSeam", (0.002, 0.002, 0.002, 1), 0.0, 0.55)
 HEAD_MATS = [M_LACQ, M_TOP, M_HEEL, M_TOE, M_CARBON, M_BRASS, M_SOLE, M_SEAM]
 I_LACQ, I_TOP, I_HEEL, I_TOE, I_CARBON, I_BRASS, I_SOLE, I_SEAM = range(8)
-SEAM = 0.16                                   # glue line between the carbon face plate and the maple body
 
 # ================================================================ head surface
-# rows: 3 deg steps over the face plate's 1 mm front round, 0.4 mm along the body, 0.1 mm over the nose (its round
-# turns fast; coarse rows show as stair steps in the reflections)
+# rows: 3 deg steps over the face plate's 1 mm front round, 0.35 mm along the body, 0.1 mm over the nose; rows sit
+# exactly on the face plate seam and on the brass nose boundary, so those material borders are clean edges
 _phi = np.radians(np.arange(0.0, 90.0, 3.0))
-rows = np.concatenate([FRONT_R * (1 - np.cos(_phi)), [1.25, 1.75, 2.5], np.arange(3.1, 86.0, 0.4),
+rows = np.concatenate([S.FRONT_R * (1 - np.cos(_phi)), [1.25, 1.75, 2.5], np.arange(3.1, 86.0, 0.35),
                        np.arange(86.0, TIP_Y - 0.15, 0.1), [TIP_Y - 0.1, TIP_Y - 0.06, TIP_Y - 0.03, TIP_Y - 0.012]])
-rows = np.unique(np.concatenate([rows, [FACE_T, NOSE_Y, 41.3 * K_Y, 42.7 * K_Y]]))
-N = 181
-cheb = -np.cos(np.pi * np.arange(N) / (N - 1))                  # -1 .. 1, dense near both edges
+rows = np.unique(np.round(np.concatenate([rows, [FACE_T - SEAM, FACE_T + SEAM, NOSE_Y, 41.3 * K_Y, 42.7 * K_Y]]), 6))
+rows = rows[~np.isclose(rows, FACE_T)]
+NO, NI = 60, 64           # top: columns per side on the chamfer (outline -> upper crease) and on the crown
+NW, NL = 48, 64           # bottom: on the side wall (outline -> lower crease) and on the sole / lower chamfer
+
+
+def _crease(y, w, inner_minus_outer):
+    """|x| of the crease on a row: where the inner part (crown / sole) stops being the one the smooth min / max
+    picks, going out from the centre line. 0 if the outer part (chamfer / wall) holds the whole row."""
+    xx = np.linspace(0.0, w * 0.99999, 1500)
+    g = inner_minus_outer(S.surfaces(xx, np.full_like(xx, y)))
+    if g[0] <= 0:
+        return 0.0
+    out = np.nonzero(g <= 0)[0]
+    if len(out) == 0:
+        return w
+    i = out[0] - 1
+    return float(xx[i] + g[i] * (xx[i + 1] - xx[i]) / (g[i] - g[i + 1]))
+
+
+def _columns(w, xc, n_out, n_in):
+    """x positions across a row: outline -> crease (clustered at the outline, where the corner round turns fast),
+    crease -> centre line, mirrored. 2 * (n_out + n_in) + 1 points from -w to +w."""
+    t = np.linspace(0.0, 1.0, n_out + 1)
+    outer = w - (w - xc) * t ** 2
+    inner = xc * (1 - np.linspace(0.0, 1.0, n_in + 1))[1:]
+    half = np.concatenate([outer, inner])
+    return np.concatenate([-half, half[::-1][1:]])
+
+
 bm = bmesh.new()
-top_rows, bot_rows = [], []
+top_rows, bot_rows, vpart = [], [], {}
 for y in rows:
-    xs = cheb * float(half_width(y))
-    d = dist(cheb * float(_hw_core(y)), np.full(N, y))               # sideways squeeze at the face corners
-    d[0] = d[-1] = 0.0
-    c, s_t, s_b = (float(v[0]) for v in row_scale(np.array([y])))
-    zt = c + U(d) * s_t
-    zb = c - L(d) * s_b
-    tr = [bm.verts.new((float(x), float(y), float(z))) for x, z in zip(xs, zt)]
-    br = [tr[0]] + [bm.verts.new((float(x), float(y), float(z))) for x, z in zip(xs[1:-1], zb[1:-1])] + [tr[-1]]
+    w = float(half_width(y))
+    xu = _crease(y, w, lambda r: r["cham"] - r["crown"])   # the min picks the crown inside the upper crease
+    xl = _crease(y, w, lambda r: r["lower"] - r["wall"])   # the max picks the sole inside the lower crease
+    xt = _columns(w, xu if xu < w else 0.0, NO, NI)
+    xb = _columns(w, xl if xl < w else 0.0, NW, NL)
+    zt = S.surfaces(xt, np.full_like(xt, y))["zt"]
+    zb = S.surfaces(xb, np.full_like(xb, y))["zb"]
+    zt[0] = zt[-1] = zb[0] = zb[-1] = float(S.zc_line(y)) * (1 - 2 * float(S.front_round(y)) / HEAD_H) \
+        + 28.0 * 2 * float(S.front_round(y)) / HEAD_H
+    tr = [bm.verts.new((float(x), float(y), float(z))) for x, z in zip(xt, zt)]
+    br = [tr[0]] + [bm.verts.new((float(x), float(y), float(z))) for x, z in zip(xb[1:-1], zb[1:-1])] + [tr[-1]]
+    front_row = y == rows[0]
+    for v in tr:
+        vpart[v] = 3 if front_row else 0
+    for v in br[1:-1]:
+        vpart[v] = 3 if front_row else 1
+    vpart[tr[0]] = vpart[tr[-1]] = 3 if front_row else 2
     top_rows.append(tr)
     bot_rows.append(br)
-tip = bm.verts.new((0.0, TIP_Y, TIP_Z))
+tip = bm.verts.new((0.0, TIP_Y, float(S.zc_line(TIP_Y))))
+vpart[tip] = 4
+NT, NB = len(top_rows[0]), len(bot_rows[0])
+seg = {}                                           # face -> ("cham" | "crown" | "wall" | "lower")
 for i in range(len(rows) - 1):
-    for j in range(N - 1):
-        bm.faces.new((top_rows[i][j], top_rows[i + 1][j], top_rows[i + 1][j + 1], top_rows[i][j + 1]))
-        bm.faces.new((bot_rows[i][j + 1], bot_rows[i + 1][j + 1], bot_rows[i + 1][j], bot_rows[i][j]))
-for j in range(N - 1):
-    bm.faces.new((top_rows[-1][j], tip, top_rows[-1][j + 1]))
-    bm.faces.new((bot_rows[-1][j + 1], tip, bot_rows[-1][j]))
-front = bm.faces.new([top_rows[0][j] for j in range(N - 1, -1, -1)] + [bot_rows[0][j] for j in range(1, N - 1)])
-bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
+    for j in range(NT - 1):
+        f = bm.faces.new((top_rows[i][j], top_rows[i + 1][j], top_rows[i + 1][j + 1], top_rows[i][j + 1]))
+        seg[f] = "cham" if (j < NO or j >= NT - 1 - NO) else "crown"
+    for j in range(NB - 1):
+        f = bm.faces.new((bot_rows[i][j + 1], bot_rows[i + 1][j + 1], bot_rows[i + 1][j], bot_rows[i][j]))
+        seg[f] = "wall" if (j < NW or j >= NB - 1 - NW) else "lower"
+for j in range(NT - 1):
+    seg[bm.faces.new((top_rows[-1][j], tip, top_rows[-1][j + 1]))] = "cham"
+for j in range(NB - 1):
+    seg[bm.faces.new((bot_rows[-1][j + 1], tip, bot_rows[-1][j]))] = "wall"
+front = bm.faces.new([top_rows[0][j] for j in range(NT - 1, -1, -1)] + [bot_rows[0][j] for j in range(1, NB - 1)])
+seg[front] = "front"
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces)   # outward, before the normals decide the materials
 bm.normal_update()
-bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-# material boundaries as real edges
-for co, no in (((0, FACE_T - SEAM, 0), (0, 1, 0)), ((0, FACE_T + SEAM, 0), (0, 1, 0)), ((0, NOSE_Y, 0), (0, 1, 0)),
-               ((0, FACE_T, BRASS_Z0), (0, -(BRASS_Z1 - BRASS_Z0) / (NOSE_Y - FACE_T), 1))):
-    geom = list(bm.verts) + list(bm.edges) + list(bm.faces)
-    bmesh.ops.bisect_plane(bm, geom=geom, plane_co=co, plane_no=Vector(no).normalized())
-bm.normal_update()
-brass_line = lambda y: BRASS_Z0 + (BRASS_Z1 - BRASS_Z0) * (y - FACE_T) / (NOSE_Y - FACE_T)
 HB = (12.0, 54.0, 22.0, 40.0)        # = make_textures.HEEL_BOX
 TB = (11.0, 65.0, 18.0, 44.0)        # = make_textures.TOE_BOX
 uv = bm.loops.layers.uv.new("proj")
@@ -701,15 +457,18 @@ uv_sole = bm.loops.layers.uv.new("sole")
 for f in bm.faces:
     cen = f.calc_center_median()
     n = f.normal
-    if cen.y < 0.02 and n.y < -0.9:
+    part = seg[f]
+    if part == "front":
         idx = I_CARBON
     elif cen.y < FACE_T - SEAM:
-        idx = I_LACQ
+        idx = I_LACQ                                 # the face plate is black all round
     elif cen.y < FACE_T + SEAM:
         idx = I_SEAM
-    elif cen.y > NOSE_Y or cen.z < brass_line(cen.y):
-        idx = I_SOLE if (n.z < -0.25 and cen.y <= NOSE_Y + 6) else I_BRASS
-    elif n.z > 0.35:
+    elif part == "lower":
+        idx = I_SOLE if n.z < -0.25 else I_BRASS     # sole plate and lower chamfers: brass
+    elif cen.y > NOSE_Y and part in ("wall", "cham"):
+        idx = I_BRASS                                # back weight: side wall / back face and its upper chamfer
+    elif part in ("cham", "crown"):
         idx = I_TOP
     elif n.x > 0.3:
         idx = I_HEEL
@@ -728,19 +487,20 @@ for f in bm.faces:
         elif idx == I_TOE:
             q = ((TB[1] - p.y) / (TB[1] - TB[0]), (p.z - TB[2]) / (TB[3] - TB[2]))
         elif idx == I_CARBON:
-            q = (p.x / 4.2, p.z / 4.2)
+            q = (p.x / 4.3, p.z / 4.3)
         else:
             q = (p.x / 50.0, p.y / 50.0)
         l[uv].uv = q
         l[uv_sole].uv = ((p.x + HEAD_W / 2) / HEAD_W, 1 - p.y / HEAD_D)
+_part = np.array([vpart[v] for v in bm.verts])
 head = mesh_obj("DP501_Head", bm)
 for m in HEAD_MATS:
     head.data.materials.append(m)
-# smooth shading from the surface's own normals (not from the triangles): even reflections on the rounds and the nose
+# smooth shading from the surface's own normals (not from the triangles): even reflections, crisp creases
 _me = head.data
 _co = np.zeros(len(_me.vertices) * 3)
 _me.vertices.foreach_get("co", _co)
-_vn = surface_normals(_co.reshape(-1, 3))
+_vn = head_normals(_co.reshape(-1, 3), _part)
 _lv = np.zeros(len(_me.loops), dtype=np.int64)
 _me.loops.foreach_get("vertex_index", _lv)
 _ln = _vn[_lv]
@@ -772,7 +532,7 @@ for px, pz in PINS:
 D = Vector((math.cos(LIE), 0.0, math.sin(LIE)))
 FRONT = Vector((-math.sin(LIE), 0.0, math.cos(LIE)))     # printed side faces the toe (photos: same side as PARKER)
 SIDE = D.cross(FRONT)                                      # = -Y: image top of the wrap
-TOP_Z = float(s_top(HOLE[1]))
+TOP_Z = float(S.surfaces(np.array([HOLE[0]]), np.array([HOLE[1]]))["zt"][0])
 P_TOP = Vector((HOLE[0], HOLE[1], TOP_Z))
 P0 = P_TOP - D * (TOP_Z / D.z)                             # axis meets the sole plane here
 S_HEAD = TOP_Z / D.z                                       # axis length from the sole plane to the head top
@@ -825,18 +585,18 @@ M_SHAFT = m
 shaft = tube("DP501_Shaft", S_HEAD - 6, CLUB_LEN - GRIP_LEN + 6, shaft_r, 260, [M_SHAFT],
              uv_fn=lambda s, v: ((WRAP[1] - s) / (WRAP[1] - WRAP[0]), v))
 
-# ferrule: sits on the head top; visible height FERRULE_H measured vertically -> along the axis / D.z
+# ferrule: sits on the head top (its foot is level, its top square to the shaft), FERRULE_LEN along the axis at the
+# centre line, so 12.5 +- 2.5 mm on its long (toe) and short (heel) sides
 fa = S_HEAD - 4.0
-fb = S_HEAD + FERRULE_H / D.z
+fb = S_HEAD + FERRULE_LEN
 def ferrule_r(s):
     e = fb - s
     return FERRULE_R - (0.9 - math.sqrt(max(0.0, 0.81 - (0.9 - e) ** 2)) if e < 0.9 else 0.0)
 M_FER = simple("DP501_Ferrule", BLACK, 0.0, 0.08, 1.0)
 ferrule = tube("DP501_Ferrule", fa, fb, ferrule_r, 40, [M_FER])
 cap_r = tube("DP501_FerruleTop", fb - 0.02, fb, lambda s: FERRULE_R - 0.9, 1, [M_FER], cap_top=True)
-bc = S_HEAD + BAND_C / D.z
-band = tube("DP501_FerruleBand", bc - BAND_H / 2 / D.z, bc + BAND_H / 2 / D.z, lambda s: FERRULE_R + 0.03, 3,
-            [holo_band()])
+bc = fb - BAND_FROM_TOP
+band = tube("DP501_FerruleBand", bc - BAND_H / 2, bc + BAND_H / 2, lambda s: FERRULE_R + 0.03, 3, [holo_band()])
 
 # grip
 G0 = CLUB_LEN - GRIP_LEN
@@ -847,8 +607,8 @@ def grip_r(s):
     r = 14.0
     if e < 2.2:                                             # rounded end
         r = 12.2 + math.sqrt(max(0.0, 2.2 ** 2 - (2.2 - e) ** 2)) * (1.8 / 2.2)
-    elif e > 250:
-        r = 14.0 - 1.4 * ((e - 250) / 100) ** 1.3
+    elif e > 0.714 * GRIP_LEN:
+        r = 14.0 - 1.4 * ((e - 0.714 * GRIP_LEN) / (0.286 * GRIP_LEN)) ** 1.3
     if e > GRIP_LEN - 3:                                    # lip down onto the shaft
         r = SHAFT_R1 + (r - SHAFT_R1) * max(0.0, (GRIP_LEN - e) / 3) ** 0.5
     return r
@@ -1043,6 +803,22 @@ if ORTHO:
     shot("bottom", HC + mm(0, 0, -400), HC, 0, flat, up=(0, -1, 0), **o)
     shot("front", HC + mm(0, -400, 0), HC, 0, flat, **o)
     shot("back", HC + mm(0, 400, 0), HC, 0, flat, **o)
+    sys.exit(0)
+
+if PHOTO:
+    o = dict(folder="check", res=(1400, 1400), bg=1.0)
+    shot("photo_face", HC + mm(0, -1100, 50), HC + mm(0, 0, 0), 200, studio() + [
+        ("sheen", HC + Vector((-0.10, -0.40, 0.30)), HC, 0.8, 1.2)], **o)
+    world_floor(0.12)
+    shot("photo_sole", HC + mm(0, 0, -1100), HC, 200, below(studio()), up=(0, -1, 0), head_only=True, **o)
+    world_floor(WORLD_STOPS[0][1])
+    shot("photo_back", HC + mm(20, 1100, 75), HC + mm(0, 0, 4), 200, studio(), **o)
+    mid = axis(400) * 0.001
+    u = Vector((0, -1, 0)) * math.cos(math.radians(28)) + Vector(FRONT) * math.sin(math.radians(28))
+    shot("photo_full", mid + u * 2.6, mid, 85,
+         [("key", mid + Vector((-0.8, -1.5, 1.2)), mid, 1.0, 70), ("fill", mid + Vector((1.2, -0.7, 0.4)), mid, 1.5, 30),
+          ("rim", mid + Vector((0.3, 1.3, 0.9)), mid, 1.0, 60)], up=tuple(D), res=(800, 1600), folder="check", bg=1.0)
+    print("done")
     sys.exit(0)
 
 if SITE:
