@@ -219,8 +219,8 @@ BRASS = (0.62, 0.40, 0.10, 1)               # deep brushed gold as on the photos
 
 
 def brass(name, engraved=False, rough_range=(0.22, 0.32)):
-    """Brushed brass, grain along X (toe-heel). Engraved: sand-blasted logos (recessed, sparkly), black DP-501,
-    screw outlines; textures on UV 'sole' (planar from below)."""
+    """Brushed brass, grain along X (toe-heel). Engraved: recessed logos filled with gold glitter (photos), dark rim
+    round them, black DP-501; textures on UV 'sole' (planar from below)."""
     m, nt, b = principled(name)
     brass_into(nt, b, engraved, rough_range)
     return m
@@ -252,14 +252,25 @@ def brass_into(nt, b, engraved=False, rough_range=(0.22, 0.32)):
         e = tex(nt, img("sole_engrave.png", False), "sole")
         k = tex(nt, img("sole_black.png", False), "sole")
         r_ = tex(nt, img("sole_rings.png", False), "sole")
-        spark = node(nt, "ShaderNodeTexVoronoi", Scale=9.0)               # sand-blast grains (object mm)
+        # gold glitter in the engraving (photos): flakes ~0.1 mm, each its own tilt and shade, so they twinkle
+        spark = node(nt, "ShaderNodeTexVoronoi", Scale=9.0, Randomness=1.0)
         spark.feature = "F1"
         nt.links.new(coord.outputs["Object"], spark.inputs["Vector"])
-        color = mix_rgb(nt, e.outputs["Color"], BRASS, (0.80, 0.55, 0.06, 1))   # sand-blasted: brighter, more yellow gold
+        flake = nt.nodes.new("ShaderNodeSeparateColor")
+        nt.links.new(spark.outputs["Color"], flake.inputs[0])
+        shade = node(nt, "ShaderNodeMapRange", **{"To Min": 0.72, "To Max": 1.0})
+        nt.links.new(flake.outputs[0], shade.inputs["Value"])
+        glit = nt.nodes.new("ShaderNodeMix")
+        glit.data_type = "RGBA"
+        glit.blend_type = "MULTIPLY"
+        glit.inputs["Factor"].default_value = 1.0
+        glit.inputs[6].default_value = (0.95, 0.70, 0.08, 1)               # glitter gold
+        nt.links.new(shade.outputs["Result"], glit.inputs[7])
+        color = mix_rgb(nt, e.outputs["Color"], BRASS, glit.outputs[2])
         color = mix_rgb(nt, r_.outputs["Color"], color, (0.05, 0.03, 0.006, 1))     # engraving rim: dark side wall
         color = mix_rgb(nt, k.outputs["Color"], color, (0.012, 0.012, 0.012, 1))
-        sr = node(nt, "ShaderNodeMapRange", **{"To Min": 0.38, "To Max": 0.62})
-        nt.links.new(spark.outputs["Distance"], sr.inputs["Value"])
+        sr = node(nt, "ShaderNodeMapRange", **{"To Min": 0.10, "To Max": 0.30})      # shiny flakes
+        nt.links.new(flake.outputs[1], sr.inputs["Value"])
         rough = mix_f(nt, e.outputs["Color"], rough, sr.outputs["Result"])
         rough = mix_f(nt, k.outputs["Color"], rough, 0.45)
         metal = mix_f(nt, k.outputs["Color"], 1.0, 0.0)
@@ -276,14 +287,28 @@ def brass_into(nt, b, engraved=False, rough_range=(0.22, 0.32)):
         eb = node(nt, "ShaderNodeBump", Strength=0.6, Distance=0.00012)
         nt.links.new(inv.outputs[0], eb.inputs["Height"])
         nt.links.new(normal, eb.inputs["Normal"])
-        gb = node(nt, "ShaderNodeBump", Strength=0.25, Distance=0.00003)
-        gm = nt.nodes.new("ShaderNodeMath")
-        gm.operation = "MULTIPLY"
-        nt.links.new(spark.outputs["Distance"], gm.inputs[0])
-        nt.links.new(e.outputs["Color"], gm.inputs[1])
-        nt.links.new(gm.outputs[0], gb.inputs["Height"])
-        nt.links.new(eb.outputs["Normal"], gb.inputs["Normal"])
-        normal = gb.outputs["Normal"]
+        # each flake tilts the normal its own way (random cell colour -> vector), only inside the engraving
+        tilt = nt.nodes.new("ShaderNodeVectorMath")
+        tilt.operation = "SUBTRACT"
+        nt.links.new(spark.outputs["Color"], tilt.inputs[0])
+        tilt.inputs[1].default_value = (0.5, 0.5, 0.5)
+        sc = nt.nodes.new("ShaderNodeVectorMath")
+        sc.operation = "SCALE"
+        nt.links.new(tilt.outputs[0], sc.inputs[0])
+        sc.inputs["Scale"].default_value = 0.6
+        add = nt.nodes.new("ShaderNodeVectorMath")
+        add.operation = "ADD"
+        nt.links.new(eb.outputs["Normal"], add.inputs[0])
+        nt.links.new(sc.outputs[0], add.inputs[1])
+        nrm = nt.nodes.new("ShaderNodeVectorMath")
+        nrm.operation = "NORMALIZE"
+        nt.links.new(add.outputs[0], nrm.inputs[0])
+        nmix = nt.nodes.new("ShaderNodeMix")
+        nmix.data_type = "VECTOR"
+        nt.links.new(e.outputs["Color"], nmix.inputs["Factor"])
+        nt.links.new(eb.outputs["Normal"], nmix.inputs[4])
+        nt.links.new(nrm.outputs[0], nmix.inputs[5])
+        normal = nmix.outputs[1]
     if isinstance(color, tuple):
         b.inputs["Base Color"].default_value = color
     else:
