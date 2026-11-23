@@ -215,9 +215,12 @@ def lacquer_into(nt, b, decal=None):
         nt.links.new(mix_f(nt, t.outputs["Alpha"], 0.12, 0.3), b.inputs["Roughness"])
 
 
-BRASS = (0.62, 0.40, 0.10, 1)               # deep brushed gold as on the photos (a brighter base reads champagne)
-# glitter in the sole engraving: flake scale (1/mm), darkest flake shade, normal tilt, flake roughness, colour
-GLIT = dict(scale=9.0, shade=0.72, tilt=0.6, rough=(0.10, 0.30), color=(0.95, 0.70, 0.08, 1))
+# yellow brushed brass: rendered with the sole photos' cameras (141, 144), the plain plate matches the photos'
+# chroma and hue (Lab C 24.9 / 25.2, hue 88.3 / 88.5 deg); the earlier (0.62, 0.40, 0.10) read too deep and orange
+BRASS = (0.64, 0.47, 0.15, 1)
+# glitter in the sole engraving: flake scale (1/mm), darkest flake shade, normal tilt, flake roughness, colour.
+# A richer gold than the plate as on the photos, with a gentle sparkle (half the earlier flake contrast)
+GLIT = dict(scale=10.5, shade=0.80, tilt=0.42, rough=(0.14, 0.30), color=(0.80, 0.60, 0.10, 1))
 if os.environ.get("BRASS"):                  # calibration: BRASS=r,g,b  GLIT=scale,shade,tilt,rmin,rmax,r,g,b
     BRASS = tuple(map(float, os.environ["BRASS"].split(","))) + (1,)
 if os.environ.get("GLIT"):
@@ -259,7 +262,7 @@ def brass_into(nt, b, engraved=False, rough_range=(0.22, 0.32)):
         e = tex(nt, img("sole_engrave.png", False), "sole")
         k = tex(nt, img("sole_black.png", False), "sole")
         r_ = tex(nt, img("sole_rings.png", False), "sole")
-        # gold glitter in the engraving (photos): flakes ~0.1 mm, each its own tilt and shade, so they twinkle
+        # gold glitter in the engraving (photos): flakes ~0.1 mm, each its own tilt and shade, a gentle twinkle
         spark = node(nt, "ShaderNodeTexVoronoi", Scale=GLIT["scale"], Randomness=1.0)
         spark.feature = "F1"
         nt.links.new(coord.outputs["Object"], spark.inputs["Vector"])
