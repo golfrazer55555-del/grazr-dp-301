@@ -1,2 +1,4 @@
 # website render intermediates (build_dp501.py --site); the site uses the WebP versions in website/public/media/dp501
 site/
+__pycache__/
+*.blend1
