@@ -32,6 +32,7 @@ RENDER = "--no-render" not in sys.argv
 ORTHO = "--ortho" in sys.argv
 SITE = "--site" in sys.argv               # dark-studio stills for the website (site/) instead of the approval set
 PHOTO = "--photo" in sys.argv             # views matching the owner's photos (check/photo_*.png) for side-by-side checks
+MATCH = "--match" in sys.argv             # the owner's photos' own cameras (check/photo_cams.json) -> check/match_*.png
 SAMPLES = int(os.environ.get("SAMPLES", "128"))
 
 # ================================================================ measured shape (SPEC.md; the head is dp501_shape.py)
@@ -182,6 +183,11 @@ BLACK = (0.0055, 0.0055, 0.0062, 1)
 def lacquer(name, decal=None):
     """Piano-black lacquer over maple; printed decal (gold / white ink) on UV 'proj'."""
     m, nt, b = principled(name)
+    lacquer_into(nt, b, decal)
+    return m
+
+
+def lacquer_into(nt, b, decal=None):
     b.inputs["Base Color"].default_value = BLACK
     b.inputs["Roughness"].default_value = 0.12
     b.inputs["Coat Weight"].default_value = 1.0
@@ -207,7 +213,6 @@ def lacquer(name, decal=None):
         nt.links.new(t.outputs["Alpha"], km.inputs[1])
         nt.links.new(mix_f(nt, km.outputs[0], 0.0, 0.55), b.inputs["Metallic"])
         nt.links.new(mix_f(nt, t.outputs["Alpha"], 0.12, 0.3), b.inputs["Roughness"])
-    return m
 
 
 BRASS = (0.86, 0.60, 0.19, 1)
@@ -217,6 +222,11 @@ def brass(name, engraved=False, rough_range=(0.17, 0.25)):
     """Brushed brass, grain along X (toe-heel). Engraved: sand-blasted logos (recessed, sparkly), black DP-501,
     screw outlines; textures on UV 'sole' (planar from below)."""
     m, nt, b = principled(name)
+    brass_into(nt, b, engraved, rough_range)
+    return m
+
+
+def brass_into(nt, b, engraved=False, rough_range=(0.17, 0.25)):
     b.inputs["Base Color"].default_value = BRASS
     b.inputs["Metallic"].default_value = 1.0
     b.inputs["Roughness"].default_value = 0.2
@@ -284,46 +294,78 @@ def brass(name, engraved=False, rough_range=(0.17, 0.25)):
         nt.links.new(metal, b.inputs["Metallic"])
     if aniso is not None:
         nt.links.new(aniso, b.inputs["Anisotropic"])
+
+
+def mnode(nt, op, a, b=None, clamp=False):
+    n = nt.nodes.new("ShaderNodeMath")
+    n.operation = op
+    n.use_clamp = clamp
+    for i, v in enumerate((a, b)):
+        if v is None:
+            continue
+        if isinstance(v, (int, float)):
+            n.inputs[i].default_value = v
+        else:
+            nt.links.new(v, n.inputs[i])
+    return n.outputs[0]
+
+
+def nose_cap_mat():
+    """Upper chamfer behind the brass boundary: the brass weight comes up the chamfer as a flat-topped cap with
+    rounded corners (back photos), black lacquer above it. Mask in object space (mm): brass where
+    Z < CAP_Z(|X|) = CAP_Z0 + (CAP_ZT - CAP_Z0) * sqrt(1 - t^2), t = clip((|X| - (CAP_X0 - CAP_RX)) / CAP_RX)."""
+    m, nt, b1 = principled("DP501_NoseCap")
+    lacquer_into(nt, b1, "top_decal.png")
+    b2 = nt.nodes.new("ShaderNodeBsdfPrincipled")
+    brass_into(nt, b2)
+    coord = nt.nodes.new("ShaderNodeTexCoord")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(coord.outputs["Object"], sep.inputs[0])
+    ax = mnode(nt, "ABSOLUTE", sep.outputs["X"])
+    t = mnode(nt, "DIVIDE", mnode(nt, "SUBTRACT", ax, CAP_X0 - CAP_RX), CAP_RX)
+    t = mnode(nt, "MINIMUM", mnode(nt, "MAXIMUM", t, 0.0), 1.0)
+    root = mnode(nt, "SQRT", mnode(nt, "SUBTRACT", 1.0, mnode(nt, "MULTIPLY", t, t)))
+    zcap = mnode(nt, "ADD", mnode(nt, "MULTIPLY", root, CAP_ZT - CAP_Z0), CAP_Z0)
+    d = mnode(nt, "SUBTRACT", zcap, sep.outputs["Z"])                     # > 0: brass
+    fac = mnode(nt, "MULTIPLY_ADD", d, 1.0 / 0.08)                          # 0.08 mm soft edge
+    fac.node.inputs[2].default_value = 0.5
+    fac.node.use_clamp = True
+    mix = nt.nodes.new("ShaderNodeMixShader")
+    nt.links.new(fac, mix.inputs["Fac"])
+    nt.links.new(b1.outputs[0], mix.inputs[1])
+    nt.links.new(b2.outputs[0], mix.inputs[2])
+    out = nt.nodes["Material Output"]
+    nt.links.new(mix.outputs[0], out.inputs["Surface"])
     return m
 
 
 def carbon_mat():
-    """Plain-weave carbon under clear coat, as on the real face: crisp 2.15 mm tows, the tows along X light and the
-    ones along Z dark (strong contrast), each with its own anisotropic sheen; tile 4.3 mm."""
+    """Plain-weave carbon under clear coat, as on the real face (photo 140): rounded 2.15 mm tows, navy black; the tows
+    along X light with a brighter upper half and thin bright ends, the ones along Z dark; each tow with its own
+    anisotropic sheen along its fibres; tile 4.3 mm."""
     m, nt, b = principled("DP501_CarbonFace")
     t = tex(nt, img("carbon.png", False), "proj", "REPEAT")
+    sh = tex(nt, img("carbon_shade.png", False), "proj", "REPEAT")
     sep = nt.nodes.new("ShaderNodeSeparateColor")
     nt.links.new(t.outputs["Color"], sep.inputs[0])
-    warp, height, streak = sep.outputs[0], sep.outputs[1], sep.outputs[2]
-    tow = mix_rgb(nt, warp, (0.016, 0.016, 0.018, 1), (0.105, 0.105, 0.11, 1))   # along Z dark, along X light
-    shade = nt.nodes.new("ShaderNodeMath")
-    shade.operation = "MULTIPLY"
-    nt.links.new(height, shade.inputs[0])
-    sk = node(nt, "ShaderNodeMapRange", **{"To Min": 0.7, "To Max": 1.0})
-    nt.links.new(streak, sk.inputs["Value"])
-    nt.links.new(sk.outputs["Result"], shade.inputs[1])
-    sh = node(nt, "ShaderNodeMapRange", **{"To Min": 0.35, "To Max": 1.0})
-    nt.links.new(shade.outputs[0], sh.inputs["Value"])
+    warp, height = sep.outputs[0], sep.outputs[1]
     col = nt.nodes.new("ShaderNodeMix")
     col.data_type = "RGBA"
     col.blend_type = "MULTIPLY"
     col.inputs["Factor"].default_value = 1.0
-    nt.links.new(tow, col.inputs[6])
-    gray = nt.nodes.new("ShaderNodeCombineColor")
-    for i in range(3):
-        nt.links.new(sh.outputs["Result"], gray.inputs[i])
-    nt.links.new(gray.outputs[0], col.inputs[7])
+    col.inputs[6].default_value = (0.135, 0.145, 0.19, 1)            # navy black at shade 1
+    nt.links.new(sh.outputs["Color"], col.inputs[7])
     nt.links.new(col.outputs[2], b.inputs["Base Color"])
-    b.inputs["Metallic"].default_value = 0.6
-    nt.links.new(mix_f(nt, warp, 0.36, 0.24), b.inputs["Roughness"])
-    b.inputs["Anisotropic"].default_value = 0.9
+    b.inputs["Metallic"].default_value = 0.45
+    nt.links.new(mix_f(nt, warp, 0.40, 0.28), b.inputs["Roughness"])
+    b.inputs["Anisotropic"].default_value = 0.8
     tan = nt.nodes.new("ShaderNodeMix")
     tan.data_type = "VECTOR"
     nt.links.new(warp, tan.inputs["Factor"])
     nt.links.new(world_vec(nt, (0, 0, 1)), tan.inputs[4])
     nt.links.new(world_vec(nt, (1, 0, 0)), tan.inputs[5])
     nt.links.new(tan.outputs[1], b.inputs["Tangent"])
-    bp = node(nt, "ShaderNodeBump", Strength=0.5, Distance=0.00015)
+    bp = node(nt, "ShaderNodeBump", Strength=0.45, Distance=0.0002)
     nt.links.new(height, bp.inputs["Height"])
     nt.links.new(bp.outputs["Normal"], b.inputs["Normal"])
     b.inputs["Coat Weight"].default_value = 1.0
@@ -370,8 +412,14 @@ M_BRASS = brass("DP501_Brass")
 M_SOLE = brass("DP501_SoleEngraved", engraved=True)
 M_PIN = brass("DP501_FacePin", rough_range=(0.32, 0.42))     # brushed like the photo's pins, a little more satin
 M_SEAM = simple("DP501_FacePlateSeam", (0.002, 0.002, 0.002, 1), 0.0, 0.55)
-HEAD_MATS = [M_LACQ, M_TOP, M_HEEL, M_TOE, M_CARBON, M_BRASS, M_SOLE, M_SEAM]
-I_LACQ, I_TOP, I_HEEL, I_TOE, I_CARBON, I_BRASS, I_SOLE, I_SEAM = range(8)
+# brass cap on the upper chamfer behind the brass boundary (back photos): flat top level with the upper crease at the
+# tip, its corners rounded down to the widest line at the boundary
+CAP_X0 = float(S.half_width(NOSE_Y))
+CAP_Z0 = float(S.zc_line(NOSE_Y))
+CAP_RX, CAP_ZT = 12.0, 48.6
+M_CAP = nose_cap_mat()
+HEAD_MATS = [M_LACQ, M_TOP, M_HEEL, M_TOE, M_CARBON, M_BRASS, M_SOLE, M_SEAM, M_CAP]
+I_LACQ, I_TOP, I_HEEL, I_TOE, I_CARBON, I_BRASS, I_SOLE, I_SEAM, I_CAP = range(9)
 
 # ================================================================ head surface
 # rows: 3 deg steps over the face plate's 1 mm front round, 0.35 mm along the body, 0.1 mm over the nose; rows sit
@@ -466,8 +514,10 @@ for f in bm.faces:
         idx = I_SEAM
     elif part == "lower":
         idx = I_SOLE if n.z < -0.25 else I_BRASS     # sole plate and lower chamfers: brass
-    elif cen.y > NOSE_Y and part in ("wall", "cham"):
-        idx = I_BRASS                                # back weight: side wall / back face and its upper chamfer
+    elif cen.y > NOSE_Y and part == "wall":
+        idx = I_BRASS                                # back weight: side wall / back face
+    elif cen.y > NOSE_Y and part == "cham":
+        idx = I_CAP                                  # back weight's cap on the upper chamfer (shader mask)
     elif part in ("cham", "crown"):
         idx = I_TOP
     elif n.x > 0.3:
@@ -480,7 +530,7 @@ for f in bm.faces:
     f.smooth = True
     for l in f.loops:
         p = l.vert.co
-        if idx == I_TOP:
+        if idx in (I_TOP, I_CAP):
             q = (p.y / HEAD_D, 1 - (p.x + HEAD_W / 2) / HEAD_W)
         elif idx == I_HEEL:
             q = ((p.y - HB[0]) / (HB[1] - HB[0]), (p.z - HB[2]) / (HB[3] - HB[2]))
@@ -803,6 +853,41 @@ if ORTHO:
     shot("bottom", HC + mm(0, 0, -400), HC, 0, flat, up=(0, -1, 0), **o)
     shot("front", HC + mm(0, -400, 0), HC, 0, flat, **o)
     shot("back", HC + mm(0, 400, 0), HC, 0, flat, **o)
+    sys.exit(0)
+
+if MATCH:
+    # cameras solved from the photos' silhouettes (pinhole, f and principal point in px of the W x H photo)
+    import json
+    cams = json.load(open(os.path.join(HERE, "check", "photo_cams.json")))
+    for name, c in cams.items():
+        only = os.environ.get("ONLY")
+        if only and name not in only.split(","):
+            continue
+        rot = Matrix((Vector(c["rt"]), Vector(c["up"]), -Vector(c["fw"]))).transposed()
+        cam.location = Vector(c["C"]) * 0.001
+        cam.rotation_euler = rot.to_euler()
+        cam_data.type = "PERSP"
+        cam_data.sensor_fit = "HORIZONTAL"
+        cam_data.sensor_width = 36.0
+        cam_data.lens = c["f"] * 36.0 / c["W"]
+        cam_data.shift_x = -(c["cx"] - c["W"] / 2) / c["W"]
+        cam_data.shift_y = (c["cy"] - c["H"] / 2) / c["W"]
+        sole = c["fw"][2] > 0.5
+        world_floor(0.12 if sole else WORLD_STOPS[0][1])
+        lights = below(studio()) if sole else studio()
+        for o in CLUB:
+            o.hide_render = False
+        scene.render.resolution_x, scene.render.resolution_y = c["W"] // 2, c["H"] // 2
+        for o in [o for o in col.objects if o.type == "LIGHT"]:
+            bpy.data.objects.remove(o, do_unlink=True)
+        for li in lights:
+            area(*li)
+        path = os.path.join(HERE, "check", "match_%s.png" % name)
+        scene.render.filepath = path
+        bpy.ops.render.render(write_still=True)
+        print("  ->", path, flush=True)
+    world_floor(WORLD_STOPS[0][1])
+    print("done")
     sys.exit(0)
 
 if PHOTO:

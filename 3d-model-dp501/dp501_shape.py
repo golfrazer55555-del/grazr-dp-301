@@ -4,13 +4,16 @@ The head is a closed surface over the top-view outline (top drawing). Its cross-
 on the real head (face photo, back photo with the owner's marked lines, sole photos):
 
     crown (top)          slightly crowned, its centre line follows the heel drawing's top silhouette
-    upper crease         where the crown meets the upper chamfer (the owner's top pink line)
+    upper crease         where the crown meets the upper chamfer (the owner's top pink line): a wide U round the nose
+                         (the crown runs on gently to the tip, so the chamfer there is ~3.6 mm tall, back photo)
     upper chamfer        35 deg on the sides (face photo), steeper round the nose
     corner line          the widest line, round 1-3 mm (the owner's middle pink line), 41 mm at the face -> 44.5 at
                          the nose tip (heel drawing)
     side wall            leans in 9 deg going down (face photo); round the nose it is the 77.5 deg back face
-    lower crease         where the wall meets the sole / lower chamfer (the owner's bottom pink line); brass below it
-    lower chamfer        28 deg (face photo), planes along the head
+    lower crease         where the wall meets the sole / lower chamfer (the owner's bottom pink line, a flat arch
+                         round the back); brass below it
+    lower chamfer        28 deg (face photo); the flat sole between the two chamfers narrows towards the back with
+                         the outline (|X| < 25.8 at the face, ~0.55 of the half width further back)
     sole                 flat, then the heel drawing's rise towards the back
 
 Coordinates in mm: X toe (-) -> heel (+), Y face (0) -> back (+), Z sole (0) -> up.
@@ -23,7 +26,7 @@ from scipy.spatial import cKDTree
 
 HEAD_W, HEAD_D, HEAD_H = 106.0, 95.0, 56.0
 FACE_T = 8.0
-NOSE_Y = 81.0
+NOSE_Y = 85.5                        # brass back weight from here (back photos: ~38 mm wide at the widest line)
 
 # ================================================================ plan outline (top drawing, unchanged)
 SE_Y0, SE_N, SE_M = 26.19, 1.592, 1.6
@@ -116,8 +119,10 @@ def poly_dist(x, y):
 TOP_KNOTS = [(44.0, 56.0), (46.0, 56.0), (48.0, 56.0), (50.0, 55.995), (52.0, 55.884), (54.0, 55.669),
              (56.0, 55.425), (58.0, 55.168), (60.0, 54.898), (62.0, 54.615), (64.0, 54.32), (66.0, 54.006),
              (68.0, 53.674), (70.0, 53.355), (72.0, 53.01), (74.0, 52.636), (76.0, 52.25), (78.0, 51.846),
-             (80.0, 51.421), (82.0, 50.968), (84.0, 50.478), (86.0, 49.947), (88.0, 49.36), (90.0, 48.69),
-             (92.0, 47.846), (94.0, 46.663), (94.4, 46.397)]
+             (80.0, 51.421), (82.0, 50.968), (84.0, 50.478), (86.0, 49.947), (88.0, 49.36), (90.0, 48.80),
+             (92.0, 48.45), (94.0, 48.08), (94.4, 48.0)]
+# (from Y 90 the crown runs on gently: the drawing's steeper drop there is the upper chamfer round the nose tip, which
+#  the back photo shows ~3.7 mm tall; the side silhouette stays within 0.7 mm of the drawing)
 _tk = np.array(TOP_KNOTS)
 _tcs = CubicSpline(_tk[:, 0], _tk[:, 1], bc_type=((1, 0.0), "not-a-knot"))
 
@@ -146,10 +151,11 @@ def front_round(y):
 P = dict(
     zc_face=41.5, zc_tip=44.5, zc_y0=45.0,        # corner line height (face photo / heel drawing's nose tip)
     k_up_side=0.745, k_up_back=1.10,              # upper chamfer slope (dz per mm inwards): 36.7 deg / 48 deg
-    cot_side=6.99, cot_back=4.54,                 # side wall leans in 8.1 deg going down; back face 77.6 deg
+    cot_side=6.99, cot_back=3.6, p_wall=8.0,      # side wall leans in 8.1 deg going down; back face 74 deg at the tip
     c_top=2.7, c_bot=14.0,                        # corner round: curvature radius c / 2 at the corner line
     crown=0.0014,                                 # crown drop dz = crown * x^2
-    xf=25.8, k_lc=0.533,                          # lower chamfer: from |x| 25.8 up at 28 deg
+    xf=25.8, k_lc=0.533, kappa=0.181, xf_c=16.64,  # lower chamfer, 28 deg: from |x| 25.8 (face photo), narrowing to
+                                                   # kappa * half width + xf_c towards the back (owner's back lines)
     b_uc=4.0, b_lc_side=5.0, b_lc_back=3.5, b_flat=8.0,   # blend widths (z) of the creases
 )
 
@@ -189,7 +195,9 @@ def surfaces(x, y, want=("zt", "zb")):
     wb = back_weight(ny)
     zc = zc_line(q[:, 1])
     kup = P["k_up_side"] + (P["k_up_back"] - P["k_up_side"]) * wb
-    cot = P["cot_side"] + (P["cot_back"] - P["cot_side"]) * wb
+    # the wall keeps the sides' slope well round the nose (the brass weight's sides are a vertical plane on the back
+    # photo) and leans back only near the tip
+    cot = P["cot_side"] + (P["cot_back"] - P["cot_side"]) * np.clip(ny, 0, 1) ** P["p_wall"]
     cham = zc + np.sqrt(P["c_top"] * d + (kup * d) ** 2)
     crown = top_line(y) - P["crown"] * xc ** 2
     # the blend never reaches the corner line itself (near the nose tip the crown comes down close to it), so the
@@ -198,7 +206,9 @@ def surfaces(x, y, want=("zt", "zb")):
     zt = smin(cham, crown, kuc)
     wall = zc - np.sqrt(P["c_bot"] * d + (cot * d) ** 2)
     base = sole_line(y)
-    lower = smax(base, base + P["k_lc"] * (np.abs(xc) - P["xf"]), P["b_flat"])
+    xf = smin(np.full_like(y, P["xf"]), P["kappa"] * hw_core(y) + P["xf_c"], 1.0)
+    bf = smin(np.full_like(y, P["b_flat"]), 0.8 * P["k_lc"] * xf, 0.5)      # the blend never reaches the centre line
+    lower = smax(base, base + P["k_lc"] * (np.abs(xc) - xf), bf)
     blc = P["b_lc_side"] + (P["b_lc_back"] - P["b_lc_side"]) * wb
     blc = smin(blc, 0.8 * np.clip(zc - lower, 0, None), 0.5)
     zb = smax(wall, lower, blc)

@@ -11,7 +11,8 @@ Writes textures/:
   sole_rings.png     screw outlines
   shaft_wrap.png     250 mm graphic band, U along the shaft (grip side = 0), V around (front = 0.5)
   grip_albedo.png / grip_bump.png / grip_cap.png
-  carbon.png         plain-weave tile (R = warp mask, G = tow height, B = fibre streaks), 2 x 2 cells of 2.1 mm
+  carbon.png         plain-weave tile (R = warp mask, G = tow height, B = fibre streaks), 2 x 2 cells of 2.15 mm
+  carbon_shade.png   albedo shade of the weave as on the face photo (same tile)
 """
 import math
 import os
@@ -385,21 +386,22 @@ def grip():
 
 # ------------------------------------------------------------------ carbon weave tile
 def carbon(n=1024):
-    """2 x 2 cells of a plain weave (one tile = 4.3 mm, measured on the face photo: 2.15 mm tows). Crisp, flat-topped
-    tows as on the real face (not rounded pillows): R = 1 where the tow runs along X (on top), G = tow height (flat
-    top, short drop at its sides and where it dives under the crossing tow), B = fibre streaks along each tow."""
+    """2 x 2 cells of a plain weave (one tile = 4.3 mm, measured on the face photo: 2.15 mm tows), as the real face
+    looks close up: rounded tows. carbon.png: R = 1 where the tow runs along X, G = tow height (rounded across the tow,
+    dipping where it dives under the crossing tow), B = fibre streaks along each tow. carbon_shade.png: albedo shade
+    seen on the photo under its top light - tows along X light with a brighter upper half and thin bright ends where
+    they dive under, tows along Z dark with faint streaks. Image rows run top -> down = Z down (V = Z / 4.3)."""
     y, x = np.mgrid[0:n, 0:n].astype(np.float32) / n * 2.0       # cell units
     cx, cy = np.floor(x), np.floor(y)
     warp = ((cx + cy) % 2) == 0                                     # tow along X on top in these cells
     fx, fy = x - cx, y - cy
-    across = np.where(warp, fy, fx)                                 # position across the tow
+    across = np.where(warp, fy, fx)                                 # 0 -> 1 across the tow (X tows: top -> bottom)
     along = np.where(warp, fx, fy)
-    edge = lambda u, w: np.clip(np.minimum(u, 1 - u) / w, 0, 1)    # 0 at the cell border -> 1 inside
-    side = edge(across, 0.10)
-    side = side * side * (3 - 2 * side)
-    end = edge(along, 0.16)
-    end = 0.55 + 0.45 * end * end * (3 - 2 * end)
-    height = side * end
+    a = np.abs(2 * across - 1)                                      # 0 on the tow's centre line -> 1 at its sides
+    dome = np.sqrt(np.clip(1 - a ** 2.2, 0, 1))                     # rounded, a little flattened on top
+    e = np.abs(2 * along - 1)                                       # 0 mid-tow -> 1 where it dives under
+    dive = 1 - 0.5 * np.clip((e - 0.72) / 0.28, 0, 1) ** 1.6
+    height = dome * dive
     rng = np.random.default_rng(501)
     streak_x = ndimage.gaussian_filter1d(rng.random(n * 4).astype(np.float32), 1.0)[:n]
     streak_y = ndimage.gaussian_filter1d(rng.random(n * 4).astype(np.float32), 1.0)[n:2 * n]
@@ -407,6 +409,17 @@ def carbon(n=1024):
     streak = (streak - streak.min()) / (streak.max() - streak.min())
     out = np.dstack([warp.astype(np.float32), np.clip(height, 0, 1), streak])
     Image.fromarray((out * 255 + 0.5).astype(np.uint8)).save(os.path.join(TEX, "carbon.png"))
+    # albedo shade
+    sm = lambda t: t * t * (3 - 2 * t)
+    upper = sm(np.clip((0.78 - across) / 0.40, 0, 1))              # 1 on the upper part of an X tow, 0 on its lower part
+    side = sm(np.clip((1 - a) / 0.20, 0, 1))                         # dark seam between neighbouring tows
+    side_ext = sm(np.clip((1.08 - a) / 0.20, 0, 1))                  # the end lines reach a little past the tow's sides
+    ends = np.clip(1 - np.abs(e - 0.88) / 0.06, 0, 1) ** 1.2        # thin bright lines near both ends of an X tow
+    shade_x = (0.26 + 0.54 * upper * (0.7 + 0.3 * streak)) * side * (0.8 + 0.2 * dive) + 0.45 * ends * side_ext
+    shade_z = (0.17 + 0.08 * dome) * side * (0.85 + 0.15 * streak)
+    shade = np.where(warp, shade_x, shade_z)
+    shade = np.clip(shade, 0, 1)
+    Image.fromarray((shade * 255 + 0.5).astype(np.uint8), "L").save(os.path.join(TEX, "carbon_shade.png"))
 
 
 def main():
