@@ -340,9 +340,9 @@ def nose_cap_mat():
 
 
 def carbon_mat():
-    """Plain-weave carbon under clear coat, as on the real face (photo 140): rounded 2.15 mm tows, navy black; the tows
-    along X light with a brighter upper half and thin bright ends, the ones along Z dark; each tow with its own
-    anisotropic sheen along its fibres; tile 4.3 mm."""
+    """Plain-weave carbon under clear coat, as on the real face: the weave's shade comes from the owner's face photo
+    (folded over the measured lattice), navy black; each tow with its own anisotropic sheen along its fibres and a
+    light bump from the rounded tows; tile 4.33 x 4.22 mm."""
     m, nt, b = principled("DP501_CarbonFace")
     t = tex(nt, img("carbon.png", False), "proj", "REPEAT")
     sh = tex(nt, img("carbon_shade.png", False), "proj", "REPEAT")
@@ -356,8 +356,8 @@ def carbon_mat():
     col.inputs[6].default_value = (0.135, 0.145, 0.19, 1)            # navy black at shade 1
     nt.links.new(sh.outputs["Color"], col.inputs[7])
     nt.links.new(col.outputs[2], b.inputs["Base Color"])
-    b.inputs["Metallic"].default_value = 0.45
-    nt.links.new(mix_f(nt, warp, 0.40, 0.28), b.inputs["Roughness"])
+    b.inputs["Metallic"].default_value = 0.3
+    nt.links.new(mix_f(nt, warp, 0.40, 0.30), b.inputs["Roughness"])
     b.inputs["Anisotropic"].default_value = 0.8
     tan = nt.nodes.new("ShaderNodeMix")
     tan.data_type = "VECTOR"
@@ -365,7 +365,7 @@ def carbon_mat():
     nt.links.new(world_vec(nt, (0, 0, 1)), tan.inputs[4])
     nt.links.new(world_vec(nt, (1, 0, 0)), tan.inputs[5])
     nt.links.new(tan.outputs[1], b.inputs["Tangent"])
-    bp = node(nt, "ShaderNodeBump", Strength=0.45, Distance=0.0002)
+    bp = node(nt, "ShaderNodeBump", Strength=0.2, Distance=0.0002)
     nt.links.new(height, bp.inputs["Height"])
     nt.links.new(bp.outputs["Normal"], b.inputs["Normal"])
     b.inputs["Coat Weight"].default_value = 1.0
@@ -537,7 +537,7 @@ for f in bm.faces:
         elif idx == I_TOE:
             q = ((TB[1] - p.y) / (TB[1] - TB[0]), (p.z - TB[2]) / (TB[3] - TB[2]))
         elif idx == I_CARBON:
-            q = (p.x / 4.3, p.z / 4.3)
+            q = (p.x / 4.33, p.z / 4.22)             # weave tile measured on the face photo
         else:
             q = (p.x / 50.0, p.y / 50.0)
         l[uv].uv = q
@@ -877,7 +877,8 @@ if MATCH:
         lights = below(studio()) if sole else studio()
         for o in CLUB:
             o.hide_render = False
-        scene.render.resolution_x, scene.render.resolution_y = c["W"] // 2, c["H"] // 2
+        k = 1400.0 / max(c["W"], c["H"])
+        scene.render.resolution_x, scene.render.resolution_y = round(c["W"] * k), round(c["H"] * k)
         for o in [o for o in col.objects if o.type == "LIGHT"]:
             bpy.data.objects.remove(o, do_unlink=True)
         for li in lights:

@@ -12,7 +12,7 @@ Writes textures/:
   shaft_wrap.png     250 mm graphic band, U along the shaft (grip side = 0), V around (front = 0.5)
   grip_albedo.png / grip_bump.png / grip_cap.png
   carbon.png         plain-weave tile (R = warp mask, G = tow height, B = fibre streaks), 2 x 2 cells of 2.15 mm
-  carbon_shade.png   albedo shade of the weave as on the face photo (same tile)
+  carbon_shade.png   albedo shade of the weave, from the owner's face photo (carbon_photo_tile.png)
 """
 import math
 import os
@@ -409,17 +409,16 @@ def carbon(n=1024):
     streak = (streak - streak.min()) / (streak.max() - streak.min())
     out = np.dstack([warp.astype(np.float32), np.clip(height, 0, 1), streak])
     Image.fromarray((out * 255 + 0.5).astype(np.uint8)).save(os.path.join(TEX, "carbon.png"))
-    # albedo shade
-    sm = lambda t: t * t * (3 - 2 * t)
-    upper = sm(np.clip((0.78 - across) / 0.40, 0, 1))              # 1 on the upper part of an X tow, 0 on its lower part
-    side = sm(np.clip((1 - a) / 0.20, 0, 1))                         # dark seam between neighbouring tows
-    side_ext = sm(np.clip((1.08 - a) / 0.20, 0, 1))                  # the end lines reach a little past the tow's sides
-    ends = np.clip(1 - np.abs(e - 0.88) / 0.06, 0, 1) ** 1.2        # thin bright lines near both ends of an X tow
-    shade_x = (0.26 + 0.54 * upper * (0.7 + 0.3 * streak)) * side * (0.8 + 0.2 * dive) + 0.45 * ends * side_ext
-    shade_z = (0.17 + 0.08 * dome) * side * (0.85 + 0.15 * streak)
-    shade = np.where(warp, shade_x, shade_z)
-    shade = np.clip(shade, 0, 1)
-    Image.fromarray((shade * 255 + 0.5).astype(np.uint8), "L").save(os.path.join(TEX, "carbon_shade.png"))
+    # albedo shade: the owner's face photo (140) rectified with its solved camera and folded over the weave lattice
+    # (tows along X 4.33 mm, along Z 4.22 mm per 2 cells, averaged over ~250 tiles, linear light, aligned with the warp
+    # mask above) -> textures/carbon_photo_tile.png (64 x 64); upsampled here, with the fibre streaks for close-ups
+    tile = np.asarray(Image.open(os.path.join(TEX, "carbon_photo_tile.png")).convert("L")).astype(np.float32) / 255.0
+    big = cv2.resize(np.tile(tile, (3, 3)), (3 * n, 3 * n), interpolation=cv2.INTER_CUBIC)
+    big = big + 2.5 * (big - ndimage.gaussian_filter(big, 0.025 * n))      # averaging softened it: sharpen back
+    big = big[n:2 * n, n:2 * n]
+    big = np.clip(big / np.percentile(big, 99.5), 0, 1) ** 2.2              # and restore the photo's contrast
+    shade = big * (0.88 + 0.12 * streak)
+    Image.fromarray((np.clip(shade, 0, 1) * 255 + 0.5).astype(np.uint8), "L").save(os.path.join(TEX, "carbon_shade.png"))
 
 
 def main():
