@@ -310,35 +310,6 @@ def mnode(nt, op, a, b=None, clamp=False):
     return n.outputs[0]
 
 
-def nose_cap_mat():
-    """Upper chamfer behind the brass boundary: the brass weight comes up the chamfer as a flat-topped cap with
-    rounded corners (back photos), black lacquer above it. Mask in object space (mm): brass where
-    Z < CAP_Z(|X|) = CAP_Z0 + (CAP_ZT - CAP_Z0) * sqrt(1 - t^2), t = clip((|X| - (CAP_X0 - CAP_RX)) / CAP_RX)."""
-    m, nt, b1 = principled("DP501_NoseCap")
-    lacquer_into(nt, b1, "top_decal.png")
-    b2 = nt.nodes.new("ShaderNodeBsdfPrincipled")
-    brass_into(nt, b2)
-    coord = nt.nodes.new("ShaderNodeTexCoord")
-    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
-    nt.links.new(coord.outputs["Object"], sep.inputs[0])
-    ax = mnode(nt, "ABSOLUTE", sep.outputs["X"])
-    t = mnode(nt, "DIVIDE", mnode(nt, "SUBTRACT", ax, CAP_X0 - CAP_RX), CAP_RX)
-    t = mnode(nt, "MINIMUM", mnode(nt, "MAXIMUM", t, 0.0), 1.0)
-    root = mnode(nt, "SQRT", mnode(nt, "SUBTRACT", 1.0, mnode(nt, "MULTIPLY", t, t)))
-    zcap = mnode(nt, "ADD", mnode(nt, "MULTIPLY", root, CAP_ZT - CAP_Z0), CAP_Z0)
-    d = mnode(nt, "SUBTRACT", zcap, sep.outputs["Z"])                     # > 0: brass
-    fac = mnode(nt, "MULTIPLY_ADD", d, 1.0 / 0.08)                          # 0.08 mm soft edge
-    fac.node.inputs[2].default_value = 0.5
-    fac.node.use_clamp = True
-    mix = nt.nodes.new("ShaderNodeMixShader")
-    nt.links.new(fac, mix.inputs["Fac"])
-    nt.links.new(b1.outputs[0], mix.inputs[1])
-    nt.links.new(b2.outputs[0], mix.inputs[2])
-    out = nt.nodes["Material Output"]
-    nt.links.new(mix.outputs[0], out.inputs["Surface"])
-    return m
-
-
 def carbon_mat():
     """Plain-weave carbon under clear coat, as on the real face: the weave's shade comes from the owner's face photo
     (folded over the measured lattice), navy black; each tow with its own anisotropic sheen along its fibres and a
@@ -412,14 +383,8 @@ M_BRASS = brass("DP501_Brass")
 M_SOLE = brass("DP501_SoleEngraved", engraved=True)
 M_PIN = brass("DP501_FacePin", rough_range=(0.32, 0.42))     # brushed like the photo's pins, a little more satin
 M_SEAM = simple("DP501_FacePlateSeam", (0.002, 0.002, 0.002, 1), 0.0, 0.55)
-# brass cap on the upper chamfer behind the brass boundary (back photos): flat top level with the upper crease at the
-# tip, its corners rounded down to the widest line at the boundary
-CAP_X0 = float(S.half_width(NOSE_Y))
-CAP_Z0 = float(S.zc_line(NOSE_Y))
-CAP_RX, CAP_ZT = 12.0, 48.6
-M_CAP = nose_cap_mat()
-HEAD_MATS = [M_LACQ, M_TOP, M_HEEL, M_TOE, M_CARBON, M_BRASS, M_SOLE, M_SEAM, M_CAP]
-I_LACQ, I_TOP, I_HEEL, I_TOE, I_CARBON, I_BRASS, I_SOLE, I_SEAM, I_CAP = range(9)
+HEAD_MATS = [M_LACQ, M_TOP, M_HEEL, M_TOE, M_CARBON, M_BRASS, M_SOLE, M_SEAM]
+I_LACQ, I_TOP, I_HEEL, I_TOE, I_CARBON, I_BRASS, I_SOLE, I_SEAM = range(8)
 
 # ================================================================ head surface
 # rows: 3 deg steps over the face plate's 1 mm front round, 0.35 mm along the body, 0.1 mm over the nose; rows sit
@@ -514,10 +479,9 @@ for f in bm.faces:
         idx = I_SEAM
     elif part == "lower":
         idx = I_SOLE if n.z < -0.25 else I_BRASS     # sole plate and lower chamfers: brass
-    elif cen.y > NOSE_Y and part == "wall":
-        idx = I_BRASS                                # back weight: side wall / back face
-    elif cen.y > NOSE_Y and part == "cham":
-        idx = I_CAP                                  # back weight's cap on the upper chamfer (shader mask)
+    elif cen.y > NOSE_Y:
+        idx = I_BRASS                                # back weight: everything behind the boundary plane - side wall /
+                                                     # back face, upper chamfer and crown (top-view photo)
     elif part in ("cham", "crown"):
         idx = I_TOP
     elif n.x > 0.3:
@@ -530,7 +494,7 @@ for f in bm.faces:
     f.smooth = True
     for l in f.loops:
         p = l.vert.co
-        if idx in (I_TOP, I_CAP):
+        if idx == I_TOP:
             q = (p.y / HEAD_D, 1 - (p.x + HEAD_W / 2) / HEAD_W)
         elif idx == I_HEEL:
             q = ((p.y - HB[0]) / (HB[1] - HB[0]), (p.z - HB[2]) / (HB[3] - HB[2]))
@@ -899,6 +863,8 @@ if PHOTO:
     shot("photo_sole", HC + mm(0, 0, -1100), HC, 200, below(studio()), up=(0, -1, 0), head_only=True, **o)
     world_floor(WORLD_STOPS[0][1])
     shot("photo_back", HC + mm(20, 1100, 75), HC + mm(0, 0, 4), 200, studio(), **o)
+    # from above, looking down along the shaft as the owner's top-view photo (face left, nose right, toe up)
+    shot("photo_top", HC + mm(62, 6, 470), HC + mm(6, 2, 36), 62, studio(), up=(-1, 0, 0), **o)
     mid = axis(400) * 0.001
     u = Vector((0, -1, 0)) * math.cos(math.radians(28)) + Vector(FRONT) * math.sin(math.radians(28))
     shot("photo_full", mid + u * 2.6, mid, 85,
