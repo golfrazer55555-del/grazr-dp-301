@@ -855,7 +855,8 @@ scene.camera = cam
 CLUB = (shaft, grip, cap)
 
 
-def area(name, loc, target, size, power, color=(1, 1, 1)):
+def area(name, loc, target, size, power, color=(1, 1, 1), glossy=True):
+    """glossy=False: the light shows in no reflection (a diffuse-only fill for printed / lacquered parts)."""
     li = bpy.data.lights.new(name, "AREA")
     if isinstance(size, tuple):
         li.shape = "RECTANGLE"
@@ -865,6 +866,7 @@ def area(name, loc, target, size, power, color=(1, 1, 1)):
     li.energy = power
     li.color = color
     ob = link(bpy.data.objects.new(name, li))
+    ob.visible_glossy = glossy
     ob.location = loc
     ob.rotation_euler = (Vector(target) - Vector(loc)).to_track_quat("-Z", "Y").to_euler()
 
@@ -1038,7 +1040,14 @@ if SITE:
          shift=(-0.08, 0.06), glow=(0.5, 0.5), **dark)
     shot("f_maple", HC + Vector((0.40, -0.10, 0.06)), HC, 85, key(HC), res=(1280, 960), **dark)
     sc = axis(PRINT_MID) * 0.001
-    shot("f_shaft", sc + Vector(FRONT) * 0.30 + mm(0, -40, 0), sc, 85, key(sc, 0.5), up=tuple(D), res=(1280, 960),
+    # like the film's shaft shot: a diffuse-only fill for the print (a softbox in the lacquer would lay a grey band
+    # over it) and two thin strips behind the shaft for the crisp edge lines of the photos
+    cam_l = sc + Vector(FRONT) * 0.30 + mm(0, -40, 0)
+    cd = (cam_l - sc).normalized()
+    shaft_l = [("fill", sc + Vector(FRONT) * 0.35 + Vector((0, -0.25, 0.20)), sc, (0.5, 0.8), 7.0, (1, 1, 1), False)]
+    for nm, ang, pw in (("stripL", 112.0, 4.5), ("stripR", -108.0, 3.8)):
+        shaft_l.append((nm, sc + (Matrix.Rotation(math.radians(ang), 3, Vector(D)) @ cd) * 0.30, sc, (0.03, 0.9), pw))
+    shot("f_shaft", cam_l, sc, 85, shaft_l, up=tuple(D), res=(1280, 960),
          **dark)
     shot("f_aim", HC + Vector((0.10, 0.05, 0.38)), HC, 70, key(HC), up=(-1, 0, 0), res=(1280, 960), **dark)
     # 3D viewer poster = the viewer's first view (website dp501.html: camera-target 0m 0.038m -0.046m,
