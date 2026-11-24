@@ -38,6 +38,23 @@ def short_hash(data):
     return hashlib.sha1(data).hexdigest()[:10]
 
 
+# /media/* is cached for a week, so a file regenerated under the same name (a new 3D model, a re-rendered
+# photo) would keep showing the old copy. Every /media/ URL in the pages gets ?v=<content hash> instead.
+MEDIA_URL = re.compile(r"/media/[A-Za-z0-9_./-]+\.(?:webp|jpe?g|png|glb|gltf|usdz|mp4|webm|svg)(?![A-Za-z0-9_?])")
+_media_v = {}
+
+
+def media_version(m):
+    url = m.group(0)
+    path = os.path.join(PUB, url.lstrip("/"))
+    if not os.path.isfile(path):
+        return url
+    if url not in _media_v:
+        with open(path, "rb") as f:
+            _media_v[url] = short_hash(f.read())[:8]
+    return url + "?v=" + _media_v[url]
+
+
 def todo(lang="ko"):
     return Markup('<span class="todo">%s</span>' % ("확인 필요" if lang == "ko" else "TBD"))
 
@@ -218,7 +235,7 @@ def main():
     fonts_css = open(os.path.join(PUB, "assets", "css", "fonts.css"), "rb").read()
     v = {"css": short_hash(css), "js": short_hash(js), "fonts": short_hash(fonts_css), "co": short_hash(co)}
     for rel, page in render_all(preload, v):
-        write(rel, re.sub(r"\n\s*\n+", "\n", page))
+        write(rel, MEDIA_URL.sub(media_version, re.sub(r"\n\s*\n+", "\n", page)))
         print("page", rel)
 
     write("site.webmanifest", json.dumps({
