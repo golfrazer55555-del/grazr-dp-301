@@ -11,7 +11,7 @@ KAKAO_URL = "https://pf.kakao.com/_DFdvX"            # 카카오톡 채널 홈
 KAKAO_CHAT_URL = "https://pf.kakao.com/_DFdvX/chat"  # 1:1 채팅 바로 열기
 PRICE_KRW = 385000
 STORE_PRICE_301 = 425000    # 네이버 스마트스토어 판매가 (사이트 결제가 더 저렴)
-SHOW_DP501 = False         # two-product site (home + /dp-301/ + /dp-501/); off until the DP-501 page is finished
+SHOW_DP501 = True          # two-product site (home + /dp-301/ + /dp-501/); off until the DP-501 page is finished
 DIRECT_PAY = True          # show the "사이트에서 바로 결제" button on the home page (after Toss approval)
 # Toss Payments (결제위젯). "test" = no real charge; switch to "live" with the live client key after approval
 # and set the live secret key as the Cloudflare secret TOSS_SECRET_KEY (never in this file).
