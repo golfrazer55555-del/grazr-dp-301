@@ -21,7 +21,7 @@
   "vars": {
     "PRICE_KRW": "385000",
     // site products and prices (KRW); the checkout sends a product key, the price is taken from here
-    "PRODUCTS": "{\"dp-301\":{\"name\":\"GRAZR DP-301 퍼터\",\"price\":385000},\"dp-501\":{\"name\":\"GRAZR DP-501 파크골프채\",\"price\":462000}}",
+    "PRODUCTS": "{\"dp-301\":{\"name\":\"GRAZR DP-301 퍼터\",\"price\":385000},\"dp-501\":{\"name\":\"GRAZR DP-501 파크골프채\",\"price\":460000}}",
     "MAX_QTY": "3"
     // The Toss Payments widget secret key (test_gsk_... now, live_gsk_... after approval) is an
     // encrypted secret named TOSS_SECRET_KEY set in the Cloudflare dashboard, never in this file.

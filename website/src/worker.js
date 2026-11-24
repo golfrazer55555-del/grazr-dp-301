@@ -13,7 +13,7 @@ const SESSION_S = 30 * 24 * 3600;
 // products sold on the site; the server, not the browser, decides each price
 const DEFAULT_PRODUCTS = {
   "dp-301": { name: "GRAZR DP-301 퍼터", price: 385000 },
-  "dp-501": { name: "GRAZR DP-501 파크골프채", price: 462000 },
+  "dp-501": { name: "GRAZR DP-501 파크골프채", price: 460000 },
 };
 function products(env) {
   try { return env.PRODUCTS ? JSON.parse(env.PRODUCTS) : DEFAULT_PRODUCTS; } catch { return DEFAULT_PRODUCTS; }
