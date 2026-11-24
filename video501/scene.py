@@ -614,6 +614,7 @@ def main():
     ap.add_argument("--stills")
     ap.add_argument("--skip-existing", action="store_true")
     ap.add_argument("--vertical", action="store_true", help="9:16 frames (1080x1920) for Shorts / Reels")
+    ap.add_argument("--budget", type=float, help="stop starting new frames after this many minutes (resume with --skip-existing)")
     a = ap.parse_args(argv)
     os.makedirs(a.out, exist_ok=True)
     setup_render(a.quality, a.vertical)
@@ -632,9 +633,13 @@ def main():
         f0, f1 = (int(x) for x in a.frames.split("-"))
     else:
         f0, f1 = 0, LAST_FRAME
+    t_start = time.time()
     for f in range(f0, f1 + 1, a.step):
         if a.skip_existing and os.path.exists(os.path.join(a.out, f"{f:04d}.png")):
             continue
+        if a.budget and time.time() - t_start > a.budget * 60:
+            print(f"budget reached before frame {f}", flush=True)
+            break
         render_frame(f, a.out)
 
 
