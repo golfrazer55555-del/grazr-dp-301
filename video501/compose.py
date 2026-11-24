@@ -43,8 +43,8 @@ COPY = [
     (11.55, 14.55, "LIMITED TO 300", "단 300개만 만든 한정판", "bottom"),
     (16.10, 21.90, "REAR BRASS WEIGHT", "후면 황동추, 낮고 깊은 무게중심", "bottom"),
     (23.90, 29.60, "GOLD-ENGRAVED BRASS SOLE", "금빛 각인을 새긴 황동 바닥", "bottom"),
-    (31.40, 37.40, "MAPLE AIMING LINE", "헤드와 샤프트의 조준 라인으로 정확하게", "bottom"),
-    (38.40, 42.70, "EASIER, MORE PRECISE", "더 쉽게, 더 정교하게", "top"),
+    (31.30, 35.30, "MAPLE AIMING LINE", "헤드와 샤프트의 조준 라인으로 정확하게", "bottom"),
+    (38.40, 42.70, "EASIER, MORE PRECISE", "더 쉽게, 더 정교하게", "bottom"),
     (43.60, 46.90, "CERTIFIED CLUB", "(사)대한파크골프협회 공인인증", "bottom"),
 ]
 
@@ -214,10 +214,15 @@ def frame_path(frames, f):
     return None
 
 
+DIM_DB, DIM_S = 10.0, 1.8            # the ending is ~13 dB softer: ease the climax down before the cut
+
+
 def audio_filter():
     a_len = M_A1 - M_A0
+    t0 = a_len - DIM_S
+    dim = f"pow(10,-{DIM_DB / 20:.3f}*(1-cos(PI*min(1,max(0,(t-{t0:.3f})/{DIM_S}))))/2)"
     return (
-        f"[1:a]atrim=start={M_A0}:end={M_A1},asetpts=PTS-STARTPTS,"
+        f"[1:a]atrim=start={M_A0}:end={M_A1},asetpts=PTS-STARTPTS,volume='{dim}':eval=frame,"
         f"afade=t=in:st=0:d=0.03,afade=t=out:st={a_len - 0.015:.3f}:d=0.015[ma];"
         f"[2:a]atrim=start={M_B0}:end={M_END},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.012[mb];"
         f"[ma][mb]concat=n=2:v=0:a=1,afade=t=out:st={DURATION - 1.2:.3f}:d=1.2,"

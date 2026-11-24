@@ -249,6 +249,7 @@ for o in HEAD_PARTS:
     FACE_ONLY.objects.link(o)
 LIGHTS["face"].light_linking.receiver_collection = FACE_ONLY
 
+RES_ASPECT = 9 / 16
 cam_data = bpy.data.cameras.new("cam")
 cam_data.clip_start = 0.005
 cam_data.sensor_width = 36.0
@@ -275,10 +276,13 @@ def lights_off(*names):
         light(n, (0, 0, 1), (0, 0, 0), 0)
 
 
-def camera(loc, target, lens, fstop=None, focus=None, roll=0.0, up=(0, 0, 1)):
+def camera(loc, target, lens, fstop=None, focus=None, roll=0.0, up=(0, 0, 1), lift=0.0):
+    """lift: lens shift that raises the subject by this fraction of the frame height (room for the copy)."""
     CAM.location = loc
     CAM.rotation_euler = look_euler(loc, target, roll, up)
     cam_data.lens = lens
+    cam_data.shift_x = 0.0
+    cam_data.shift_y = -lift * min(1.0, RES_ASPECT)
     cam_data.dof.use_dof = fstop is not None
     if fstop is not None:
         cam_data.dof.aperture_fstop = fstop
@@ -312,7 +316,7 @@ def mirror_light(name, surf_c, surf_n, power, off=0.0, side=0.0, dist=0.45, size
 # Pendulum in the swing plane (shaft line + target line); the pivot sits above the hands.
 AXIS = D_SHAFT.cross(Vector((0, 1, 0))).normalized()    # +angle moves the head toward the target (-Y)
 PIVOT = axis_pt(1150.0)
-PHI_B = 0.22                                            # backswing (rad, ~13 deg)
+PHI_B = 0.20                                            # backswing (rad, ~11 deg)
 PHI_F = 0.16                                            # held finish (rad)
 SWING = 1.30                                            # top of backswing -> impact (s), unhurried
 OMEGA = math.pi / (2 * SWING)
@@ -438,7 +442,7 @@ def pose_sole(t, a, b):
     hc_m = Vector((0.0, 46.0, 28.0))
     ROOT.matrix_world = (Matrix.Translation(centre) @ Matrix.Rotation(spin, 4, "Z") @ Matrix.Rotation(tilt, 4, "X")
                          @ Matrix.Diagonal((MM, MM, MM, 1.0)) @ Matrix.Translation(-hc_m))
-    camera(Vector((0.0, -0.34, 0.20 - 0.012 * u)), centre + Vector((0, 0, 0.004)), 75, fstop=6.3)
+    camera(Vector((0.0, -0.34, 0.20 - 0.012 * u)), centre + Vector((0, 0, 0.004)), 64, fstop=6.3, lift=0.035)
     sx = lerp(-0.45, 0.45, ease_io(lin(t, a + 0.3, b - 0.3)))
     light("sweep", (sx, -0.28, 0.30), centre, 34)
     light("top", (0.0, -0.05, 0.55), centre, 12)
@@ -454,16 +458,21 @@ def pose_shaft(t, a, b):
     show()
     ROOT.matrix_world = STAND
     floor_pool(0.0, 0.04, 0.18, 0.55)
-    s = lerp(430.0, 70.0, u)                             # mm along the shaft (print band 200-450)
+    s = lerp(430.0, 225.0, ease_io(lin(t, a, a + 4.3)))  # mm along the shaft (print band 200-450)
     p = axis_pt(s)
-    side = FRONT * lerp(0.20, 0.10, u) + Vector((0.0, -lerp(0.05, 0.18, u), lerp(0.0, 0.16, u)))
-    tgt = p.lerp(HC + Vector((0.0, 0.0, 0.02)), ease_io(lin(t, a + 3.2, b)))
-    camera(p + side, tgt, lerp(85, 55, u), fstop=8.0, up=tuple(D_SHAFT.lerp(Vector((0, 0, 1)), u)))
+    w = ease_io(lin(t, a + 4.0, a + 5.5))               # quick crane from the band down to the head top
+    p_end = axis_pt(70.0)
+    cam_band = p + FRONT * lerp(0.20, 0.17, u) + Vector((0.0, -0.05, 0.0))
+    cam_head = p_end + FRONT * 0.10 + Vector((0.0, -0.18, 0.16))
+    tgt = p.lerp(HC + Vector((0.0, 0.0, 0.02)), w)
+    push = ease_io(lin(t, a + 5.5, b))                   # then a slow push on the head top
+    camera(cam_band.lerp(cam_head, w), tgt, lerp(85, 55, w) + 7 * push, fstop=8.0,
+           up=tuple(D_SHAFT.lerp(Vector((0, 0, 1)), w)), lift=0.04 * w)
     light("rimL", p + Vector((-0.30, -0.25, 0.25)), p, 45)
     light("rimR", p + Vector((0.30, 0.30, 0.20)), p, 40)
     light("soft", p + FRONT * 0.35 + Vector((0, -0.25, 0.20)), p, 30, size=(0.5, 0.8))
-    light("top", HC + Vector((0.0, -0.05, 0.45)), HC, 14 * ease(lin(t, a + 3.0, b)))
-    mirror_light("face", HC + Vector((0, 0, 0.026)), (0, 0, 1), 30 * ease(lin(t, a + 3.5, b)), off=26.0)
+    light("top", HC + Vector((0.0, -0.05, 0.45)), HC, 14 * ease(lin(t, a + 3.8, a + 5.6)))
+    mirror_light("face", HC + Vector((0, 0, 0.026)), (0, 0, 1), 30 * ease(lin(t, a + 4.2, a + 6.2)), off=26.0)
     lights_off("key", "fill", "sweep")
 
 
@@ -476,8 +485,8 @@ def pose_stroke(t, a, b):
     bc, roll = ball_state(t)
     BALL.matrix_world = Matrix.Translation(bc) @ Matrix.Rotation(-roll, 4, "X")
     drift = ease_io(lin(t, a, b))
-    cam = Vector((-0.80, lerp(-0.01, -0.05, drift), 0.090))
-    camera(cam, Vector((0.0, lerp(-0.01, -0.05, drift), 0.060)), 46, fstop=8.0, focus=0.80)
+    cy = lerp(0.045, -0.05, drift)
+    camera(Vector((-0.80, cy, 0.090)), Vector((0.0, cy, 0.060)), 42, fstop=8.0, focus=0.80)
     light("key", (-0.55, -0.20, 0.70), (0, -0.05, 0.0), 55)
     light("rimL", (0.10, 0.45, 0.20), HC, 60)
     light("rimR", (0.45, -0.45, 0.20), (0, -0.10, 0.03), 45)
@@ -496,7 +505,7 @@ def pose_finale(t, a, b):
     ang = math.radians(lerp(-150.0, -105.0, u))        # around the head, 0 = +X (heel)
     r = lerp(0.48, 0.40, u)
     loc = HC + Vector((r * math.cos(ang) * -1.0, r * math.sin(ang), lerp(0.10, 0.14, u)))
-    camera(loc, HC + Vector((0.0, 0.0, 0.012)), 55, fstop=5.6)
+    camera(loc, HC + Vector((0.0, 0.0, 0.012)), 55, fstop=5.6, lift=0.075)
     light("rimL", (-0.38, 0.34, 0.20), HC, 70)
     light("rimR", (0.40, 0.36, 0.22), HC, 60)
     light("key", (0.30, -0.40, 0.50), HC, 30)
@@ -546,6 +555,8 @@ def setup_render(q, vertical=False):
         r.resolution_x, r.resolution_y = r.resolution_y, r.resolution_x
         cam_data.sensor_fit = "HORIZONTAL"
         cam_data.sensor_width = 36.0 * VERTICAL_K
+    global RES_ASPECT
+    RES_ASPECT = r.resolution_y / r.resolution_x
     r.resolution_percentage = 100
     r.use_persistent_data = True
     r.film_transparent = False
