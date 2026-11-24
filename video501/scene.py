@@ -468,9 +468,15 @@ def pose_shaft(t, a, b):
     push = ease_io(lin(t, a + 5.5, b))                   # then a slow push on the head top
     camera(cam_band.lerp(cam_head, w), tgt, lerp(85, 55, w) + 7 * push, fstop=8.0,
            up=tuple(D_SHAFT.lerp(Vector((0, 0, 1)), w)), lift=0.04 * w)
-    light("rimL", p + Vector((-0.30, -0.25, 0.25)), p, 45)
-    light("rimR", p + Vector((0.30, 0.30, 0.20)), p, 40)
-    light("soft", p + FRONT * 0.35 + Vector((0, -0.25, 0.20)), p, 30, size=(0.5, 0.8))
+    # the print is lit by a soft source that leaves no reflection (diffuse only: a softbox in the glossy lacquer
+    # lays a grey band right over the print); two thin strips behind the shaft give the crisp edge lines the
+    # photos show
+    cam_dir = (CAM.location - p).normalized()
+    for nm, ang, pw in (("rimL", 112.0, 40), ("rimR", -108.0, 34)):
+        d = Matrix.Rotation(math.radians(ang), 3, D_SHAFT) @ cam_dir
+        light(nm, p + d * 0.30, p, pw, size=(0.03, 0.9))
+    light("soft", p + FRONT * 0.35 + Vector((0, -0.25, 0.20)), p, 38, size=(0.5, 0.8))
+    LIGHTS["soft"].visible_glossy = False
     light("top", HC + Vector((0.0, -0.05, 0.45)), HC, 14 * ease(lin(t, a + 3.8, a + 5.6)))
     mirror_light("face", HC + Vector((0, 0, 0.026)), (0, 0, 1), 30 * ease(lin(t, a + 4.2, a + 6.2)), off=26.0)
     lights_off("key", "fill", "sweep")
@@ -492,6 +498,7 @@ def pose_stroke(t, a, b):
     light("rimR", (0.45, -0.45, 0.20), (0, -0.10, 0.03), 45)
     light("top", (0.0, -0.05, 0.50), (0, -0.05, 0.0), 10)
     light("soft", (-0.60, 0.10, 0.25), HC, 20, size=(0.6, 0.4))
+    LIGHTS["soft"].visible_glossy = False          # its reflection made the black shaft read as chrome
     lights_off("fill", "sweep", "face")
 
 
@@ -527,6 +534,8 @@ def pose(t):
     for nm in ("rimL", "rimR"):
         LIGHTS[nm].data.size, LIGHTS[nm].data.size_y = DEFAULT_RIM
     LIGHTS["sweep"].data.size, LIGHTS["sweep"].data.size_y = DEFAULT_SWEEP
+    for ob in LIGHTS.values():
+        ob.visible_glossy = True
     for o in HEAD_PARTS:
         o.hide_render = False
     lights_off("face")

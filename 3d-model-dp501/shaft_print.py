@@ -50,7 +50,7 @@ SS = 4                                      # supersampling for filled shapes
 
 GOLD, SILVER, WHITE = 0, 1, 2
 INK_RGB = {GOLD: (214, 182, 112), SILVER: (176, 178, 180), WHITE: (240, 240, 236)}
-INK_METAL = {GOLD: 0.55, SILVER: 0.6, WHITE: 0.0}
+INK_METAL = {GOLD: 0.3, SILVER: 0.35, WHITE: 0.0}    # pigment inks with a metallic sheen (photos)
 
 HEX_U = 536.0
 LINE_TIP = HEX_U + 175.0                    # the aim line runs on to here on the club (the drawing stops at 650)
