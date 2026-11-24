@@ -9,7 +9,7 @@ Writes textures/:
   sole_engrave.png   sand-blasted engraving mask, planar from below (U = (X+53)/106, V = 1 - Y/95)
   sole_black.png     black-filled DP-501
   sole_rings.png     dark rim round the engraving (no screws: owner)
-  shaft_wrap.png     250 mm graphic band, U along the shaft (grip side = 0), V around (front = 0.5)
+  shaft_wrap.png     shaft print (shaft_print.py): U along the shaft (grip side = 0), V around (front = 0.5)
   grip_albedo.png / grip_bump.png / grip_cap.png
   carbon.png         plain-weave tile (R = warp mask, G = tow height, B = fibre streaks), 2 x 2 cells of 2.15 mm
   carbon_shade.png   albedo shade of the weave, from the owner's face photo (carbon_photo_tile.png)
@@ -21,6 +21,8 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from scipy import ndimage
+
+import shaft_print
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -277,60 +279,6 @@ def sole(ppm=15):
     rings.save(os.path.join(TEX, "sole_rings.png"))
 
 
-# ------------------------------------------------------------------ shaft wrap
-INK = {"gold": np.array(GOLD) / 255, "grey": np.array((150, 151, 156)) / 255, "white": np.array(WHITE) / 255}
-
-
-def inks(a):
-    """Shaft print inks (drawing legend: white, PANTONE Cool Gray 7 C, PANTONE 4515 C). Returns alpha, class."""
-    r, g, b = a[..., 0], a[..., 1], a[..., 2]
-    L, sat = a.mean(2), a.max(2) - a.min(2)
-    red = (r > 0.55) & (g < 0.4) & (b < 0.4)
-    gold = np.clip((r - b - 0.10) / 0.10, 0, 1) * np.clip((r - 0.30) / 0.2, 0, 1) * \
-        np.clip((g / np.maximum(r, 1e-3) - 0.55) / 0.1, 0, 1)
-    neutral = np.clip(1 - (sat - 0.08) / 0.08, 0, 1)
-    white = np.clip((L - 0.70) / 0.1, 0, 1) * neutral
-    grey = np.clip((L - 0.36) / 0.1, 0, 1) * np.clip((0.74 - L) / 0.06, 0, 1) * neutral
-    al = np.maximum.reduce([gold, white, grey]) * ~red
-    cls = np.argmax(np.stack([gold, grey, white], -1), -1)       # 0 gold, 1 grey, 2 white
-    return al, cls
-
-
-def shaft_wrap(scale=4):
-    a = load("shaft-front-closeup-design.jpg")
-    band = a[378:523]                          # unrolled print: full circumference, front at the middle row
-    ppm = 2.44                                 # drawing px per mm (85 mm = 207 px)
-    Lpx = int(250 * ppm)
-    n = min(Lpx, band.shape[1])
-    full = np.zeros((band.shape[0], Lpx, 3), np.float32)
-    full[:, :n] = band[:, :n]
-    al = np.zeros(full.shape[:2], np.float32)
-    cls = np.zeros(full.shape[:2], np.int64)
-    al[:, :n], cls[:, :n] = inks(band[:, :n])
-    # the aiming line runs on to the end of the 250 mm band
-    if n < Lpx:
-        rows = al[:, n - 30:n - 8].mean(1) > 0.45
-        al[rows, n:] = al[rows, n - 12][:, None]
-        cls[rows, n:] = cls[rows, n - 12][:, None]
-    # back label across the seam (top and bottom rows of the unrolled print)
-    al[:14] = 0
-    al[-14:] = 0
-    back = a[795:828, 225:446]
-    bal, bcls = inks(back)
-    hb = back.shape[0] // 2
-    cx = int(134 * ppm) - back.shape[1] // 2
-    xs = slice(cx, cx + back.shape[1])
-    al[:back.shape[0] - hb, xs], cls[:back.shape[0] - hb, xs] = bal[hb:], bcls[hb:]
-    al[-hb:, xs], cls[-hb:, xs] = bal[:hb], bcls[:hb]
-    H2, W2 = band.shape[0] * scale, Lpx * scale
-    big_al = cv2.resize(al, (W2, H2), interpolation=cv2.INTER_CUBIC)
-    big_al = smooth_alpha(cv2.GaussianBlur(big_al, (0, 0), scale * 0.35), 0.3, 0.6)
-    big_cls = cv2.resize(cls.astype(np.uint8), (W2, H2), interpolation=cv2.INTER_NEAREST)
-    col = np.choose(big_cls[..., None], [INK["gold"][None, None], INK["grey"][None, None], INK["white"][None, None]])
-    out = np.dstack([col, big_al])
-    Image.fromarray((out * 255 + 0.5).astype(np.uint8), "RGBA").save(os.path.join(TEX, "shaft_wrap.png"))
-
-
 # ------------------------------------------------------------------ grip
 GRIP_LEN = 280.0                            # owner's measurement
 GRIP_CIRC = math.pi * 28.0
@@ -462,7 +410,7 @@ def main():
     side_heel()
     side_toe()
     sole()
-    shaft_wrap()
+    shaft_print.build()                     # shaft_wrap.png + shaft_wrap_metal.png, drawn at 30 px/mm
     grip()
     carbon()
     print("textures ->", TEX)

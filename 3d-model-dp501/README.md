@@ -6,7 +6,9 @@
 | 파일 | 내용 |
 |---|---|
 | `dp501_shape.py` | 헤드 형태 (numpy만 사용): 평면 윤곽, 옆 실루엣, 주름 단면의 각 면과 이음 |
-| `make_textures.py` | 윗면 그래픽, 바닥 각인, 옆면 글씨, 샤프트 인쇄, 그립, 카본 직조 텍스처 |
+| `make_textures.py` | 윗면 그래픽, 바닥 각인, 옆면 글씨, 그립, 카본 직조 텍스처 (샤프트 인쇄는 `shaft_print.py`를 부름) |
+| `shaft_print.py` | 샤프트 인쇄를 30 px/mm로 새로 그림 (`textures/shaft_wrap.png`, `shaft_wrap_metal.png`). GR 마크·GRAZR는 고해상도 로고, 크라운·링·X 매듭·조준선은 측정한 치수의 도형, 단풍잎은 뒷면 사진에서 딴 모양(`textures/shaft_leaf.json`)을 도안·사진 위치에 배치, 뒷면 PREMIUM MAPLE TREE는 사진의 각진 글자를 그대로 구성. `--check`는 펼친 그림 `check/shaft_print_flat.png` |
+| `fonts/` | DESIGN BY GRAZR STUDIO 글꼴 Montserrat ExtraBold (SIL Open Font License 1.1) |
 | `web_textures.py` | 웹용 3D 모델의 텍스처: 렌더 재질의 노드 합성(글리터·데칼·카본)을 이미지로 미리 합성 |
 | `build_dp501.py` | 헤드·샤프트·페럴·그립 모델링, 재질, 렌더 |
 | `compare_views.py` | 정사영 렌더 위에 도안 외곽선을 겹쳐 확인 (`check/compare_*.jpg`) |

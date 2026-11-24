@@ -58,7 +58,8 @@ GRIP_LEN = 280.0
 FERRULE_R, FERRULE_LEN = 9.2, 12.5       # ferrule length along the axis at its centre line
 BAND_FROM_TOP, BAND_H = 4.5, 2.1         # holographic band: centre 4.5 mm below the ferrule top, 2.1 mm wide
 SHAFT_R0, SHAFT_R1 = 8.0, 9.75           # at the ferrule / under the grip
-WRAP = (200.0, 450.0)                    # shaft graphic band, distance along the axis from the sole plane
+WRAP = (120.0, 465.0)                    # printed span of shaft_wrap.png (shaft_print.py), from the sole plane
+PRINT_MID = 325.0                        # the knot (hex) of the shaft print, from the sole plane
 SEAM = 0.16                              # glue line between the carbon face plate and the maple body
 
 
@@ -632,8 +633,10 @@ b.inputs["Roughness"].default_value = 0.1
 b.inputs["Coat Weight"].default_value = 1.0
 b.inputs["Coat Roughness"].default_value = 0.012
 t = tex(nt, img("shaft_wrap.png"))
+tm = tex(nt, img("shaft_wrap_metal.png", False))
 nt.links.new(mix_rgb(nt, t.outputs["Alpha"], BLACK, t.outputs["Color"]), b.inputs["Base Color"])
-nt.links.new(mix_f(nt, t.outputs["Alpha"], 0.0, 0.45), b.inputs["Metallic"])
+nt.links.new(tm.outputs["Color"], b.inputs["Metallic"])                  # per ink: gold / silver metallic, white not
+nt.links.new(mix_f(nt, t.outputs["Alpha"], 0.1, 0.22), b.inputs["Roughness"])
 M_SHAFT = m
 shaft = tube("DP501_Shaft", S_HEAD - 6, CLUB_LEN - GRIP_LEN + 6, shaft_r, 260, [M_SHAFT],
              uv_fn=lambda s, v: ((WRAP[1] - s) / (WRAP[1] - WRAP[0]), v))
@@ -1034,7 +1037,7 @@ if SITE:
     shot("f_brass", back_c + Vector((0.12, 0.36, 0.11)), back_c + mm(0, -10, 0), 85, soft, res=(1280, 960),
          shift=(-0.08, 0.06), glow=(0.5, 0.5), **dark)
     shot("f_maple", HC + Vector((0.40, -0.10, 0.06)), HC, 85, key(HC), res=(1280, 960), **dark)
-    sc = axis(WRAP[0] + 125) * 0.001
+    sc = axis(PRINT_MID) * 0.001
     shot("f_shaft", sc + Vector(FRONT) * 0.30 + mm(0, -40, 0), sc, 85, key(sc, 0.5), up=tuple(D), res=(1280, 960),
          **dark)
     shot("f_aim", HC + Vector((0.10, 0.05, 0.38)), HC, 70, key(HC), up=(-1, 0, 0), res=(1280, 960), **dark)
@@ -1062,7 +1065,7 @@ mid = axis(430) * 0.001
 shot("08_full", mid + Vector((-0.75, -2.3, 0.2)), mid, 85,
      [("key", mid + Vector((-0.9, -1.4, 1.2)), mid, 1.2, 90), ("fill", mid + Vector((1.2, -0.7, 0.4)), mid, 1.5, 30),
       ("rim", mid + Vector((0.3, 1.3, 0.9)), mid, 1.0, 60)], res=(1200, 1600))
-sc = axis(WRAP[0] + 125) * 0.001
+sc = axis(PRINT_MID) * 0.001
 toe_view = Vector(FRONT) * 0.36
 # strip lights to the sides: thin crisp highlights along the shaft's edges (as in the photos), print left readable
 shot("09_shaft", sc + toe_view + mm(0, -40, 0), sc, 85,

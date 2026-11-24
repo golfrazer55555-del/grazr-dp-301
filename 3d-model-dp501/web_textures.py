@@ -127,13 +127,16 @@ def grip(out, grip_len, circ, size=(512, 2048)):
     return out + ".png", save_rgb(encode_n(n), out + "_n.png", size)
 
 
-def shaft(out, black, size=(1600, 380)):
-    d = load("shaft_wrap.png")
+def shaft(out, black, size=(4096, 684)):
+    """Shaft print (shaft_print.py): base over the black lacquer, metallic per ink from shaft_wrap_metal.png."""
+    im = Image.open(os.path.join(TEX, "shaft_wrap.png")).convert("RGBA").resize(size, Image.LANCZOS)
+    d = np.asarray(im).astype(np.float64) / 255.0
+    met = np.asarray(Image.open(os.path.join(TEX, "shaft_wrap_metal.png")).convert("L").resize(size, Image.LANCZOS))
     a = d[..., 3:4]
     base = to_lin(d[..., :3]) * a + np.asarray(black[:3]) * (1 - a)
     base[:, :2] = base[:, -2:] = black[:3]               # clamped edges stay black outside the printed band
-    return (save_rgb(base, out + ".png", size, srgb=True),
-            save_rgb(mr(np.full_like(a[..., 0], 0.1), 0.45 * a[..., 0]), out + "_mr.png", size))
+    return (save_rgb(base, out + ".png", srgb=True),
+            save_rgb(mr(0.1 + 0.12 * a[..., 0], met.astype(np.float64) / 255.0), out + "_mr.png"))
 
 
 def cap(out, size=(512, 512)):
