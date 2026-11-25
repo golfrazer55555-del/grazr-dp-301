@@ -3,6 +3,7 @@
 - 영상: `GRAZR_DP-501_film.mp4` (50.8초, 1920×1080, 24fps)
 - 세로 영상(쇼츠·릴스): `GRAZR_DP-501_film_9x16.mp4` (1080×1920)
 - 썸네일: `GRAZR_DP-501_film_thumb.jpg` (1280×720)
+- 세로 영상 표지(쇼츠·릴스 커버): `GRAZR_DP-501_film_9x16_cover.jpg` (1080×1920)
 
 ---
 
