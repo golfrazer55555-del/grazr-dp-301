@@ -183,6 +183,7 @@ KO = {
     ],
     "footer_terms": ("이용약관", "/terms/"),
     "footer_privacy": ("개인정보처리방침", "/privacy/"),
+    "escrow_note": "구매안전서비스: 고객님의 안전한 거래를 위해 계좌이체로 결제하시면 당사가 가입한 토스페이먼츠의 구매안전(에스크로) 서비스를 이용하실 수 있습니다.",
     "biz_labels": {"name": "상호", "ceo": "대표자", "biz_no": "사업자등록번호", "mail_order_no": "통신판매업 신고번호",
                    "address": "주소", "phone": "전화", "email": "이메일", "hosting": "호스팅 제공자"},
     "todo": "확인 필요",

@@ -214,6 +214,7 @@ section { position: relative; }
 .biz > div { display: flex; gap: 8px; }
 .biz dt { color: #6c6c72; }
 .biz dd { margin: 0; color: var(--muted); }
+.escrow { margin: 20px 0 0; color: #7a7a80; font-size: 13px; line-height: 1.6; }
 .copy { margin: 24px 0 0; color: #5e5e64; }
 
 /* legal + 404 */

@@ -123,7 +123,7 @@ function orderMail(env, d, ship, isTest) {
     "상품: " + (ship.productName || d.orderName),
     "옵션: " + (ship.option || "-") + " / 수량 " + (ship.qty || "-") + "개",
     "결제 금액: " + won(d.totalAmount),
-    "결제 수단: " + (d.method || "-"),
+    "결제 수단: " + (d.method || "-") + (d.useEscrow ? " (에스크로: 토스 상점관리자에 배송 등록 필요)" : ""),
     "결제 시각: " + kst(d.approvedAt),
     "",
     "[받는 분]",
@@ -219,7 +219,7 @@ async function confirm(request, env, ctx) {
   if (env.ORDERS) {
     after.push(store(env).add({
       orderId: d.orderId, paymentKey: d.paymentKey || paymentKey, orderName: d.orderName, amount: d.totalAmount,
-      method: d.method || "", approvedAt: d.approvedAt || new Date().toISOString(),
+      method: (d.method || "") + (d.useEscrow ? " (에스크로)" : ""), approvedAt: d.approvedAt || new Date().toISOString(),
       receiptUrl: (d.receipt && d.receipt.url) || "", test: isTest, ...ship,
     }).catch((e) => console.error("order save failed", d.orderId, e && e.message)));
   }

@@ -72,6 +72,7 @@
       <div><dt>{{ t.biz_labels[key] }}</dt><dd>{% if key == "phone" %}{% if t.lang == 'ko' %}<a href="tel:{{ biz.phone }}">{{ biz.phone }}</a>{% else %}<a href="tel:{{ biz.phone_intl }}">{{ biz.phone_intl }}</a>{% endif %}{% elif key == "email" and biz.email %}<a href="mailto:{{ biz.email }}">{{ biz.email }}</a>{% else %}{{ val(biz[key]) }}{% endif %}</dd></div>
       {% endfor %}
     </dl>
+    {% if t.escrow_note and direct_pay %}<p class="escrow">{{ t.escrow_note }}</p>{% endif %}
     <p class="copy">© {{ year }} GRAZR. All rights reserved.</p>
   </div>
 </footer>
