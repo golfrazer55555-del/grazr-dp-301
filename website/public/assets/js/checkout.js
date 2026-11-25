@@ -3,6 +3,7 @@
   "use strict";
   function won(n) { return Number(n).toLocaleString("ko-KR") + "원"; }
   function store(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function track(name, params) { try { if (window.gtag) window.gtag("event", name, params); } catch (e) {} }
   function load(k) { try { return JSON.parse(sessionStorage.getItem(k) || "null"); } catch (e) { return null; } }
 
   var box = document.querySelector("[data-checkout]");
@@ -90,6 +91,8 @@
       store("grazr-order-" + orderId, { product: product, orderName: orderName, name: value("name"), address: address,
         phone: value("phone").replace(/[^0-9]/g, ""), email: value("email"), memo: value("memo"), option: label, qty: String(q) });
       payBtn.disabled = true;
+      track("begin_checkout", { currency: "KRW", value: price * q,
+        items: [{ item_id: product, item_name: productName, item_variant: label, price: price, quantity: q }] });
       widgets.requestPayment({
         orderId: orderId,
         orderName: orderName,
@@ -154,6 +157,12 @@
         if (!x.ok) throw x.j;
         store("grazr-done-" + orderId, x.j);
         show(x.j);
+        if (!x.j.isTest) {
+          var o = load("grazr-order-" + orderId) || {}, n = Number(o.qty) || 1;
+          track("purchase", { transaction_id: x.j.orderId, currency: "KRW", value: x.j.totalAmount,
+            items: [{ item_id: o.product || "dp-301", item_name: x.j.orderName || o.orderName || "", item_variant: o.option || "",
+                      price: Math.round(x.j.totalAmount / n), quantity: n }] });
+        }
       }).catch(function (e) {
         title.textContent = "결제가 완료되지 않았습니다";
         msg.textContent = ((e && e.message) || "결제 승인 중 문제가 생겼습니다.") + " 결제되지 않았으니 다시 시도해 주세요.";

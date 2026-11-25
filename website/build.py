@@ -68,7 +68,7 @@ def fill_values():
     return {
         "name": b["name"], "ceo": b["ceo"], "phone": b["phone"], "email": b["email"],
         "privacy_officer": b["privacy_officer"], "courier": s["courier"], "return_fee": s["return_fee"],
-        "exchange_fee": s["exchange_fee"], "return_address": s["return_address"], "effective": C.TERMS_EFFECTIVE,
+        "exchange_fee": s["exchange_fee"], "return_address": s["return_address"], "effective": C.TERMS_EFFECTIVE, "revised": C.PRIVACY_REVISED,
     }
 
 
@@ -188,7 +188,8 @@ def main():
     common = dict(site_url=C.SITE_URL, store_url=C.STORE_URL, youtube_url=C.YOUTUBE_URL, kakao_url=C.KAKAO_URL, instagram_url=C.INSTAGRAM_URL, kakao_chat_url=C.KAKAO_CHAT_URL, biz=C.BUSINESS,
                   options=C.OPTIONS, shipping=C.SHIPPING, notice=C.NOTICE, direct_pay=C.DIRECT_PAY,
                   hero_frames=hero_frames, year=datetime.date.today().year, fill=fill,
-                  price=C.PRICE_KRW, pay_mode=C.PAY_MODE, toss_client_key=C.TOSS_CLIENT_KEY, products=C.PRODUCTS)
+                  price=C.PRICE_KRW, pay_mode=C.PAY_MODE, toss_client_key=C.TOSS_CLIENT_KEY, products=C.PRODUCTS,
+                  ga_id=C.GA_ID)
 
     def render_all(preload, v):
         pages = []

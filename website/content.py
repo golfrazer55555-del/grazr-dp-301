@@ -17,6 +17,8 @@ DIRECT_PAY = True          # show the "사이트에서 바로 결제" button on 
 # and set the live secret key as the Cloudflare secret TOSS_SECRET_KEY (never in this file).
 PAY_MODE = "live"
 TOSS_CLIENT_KEY = "live_gck_c19zorA9SpFACqnxWJmfGDQguN0UkIlZYs"   # 아이엔골프 결제위젯 라이브 클라이언트 키 (public)
+GA_ID = "G-KBEM7SWSQK"     # Google Analytics 4 측정 ID (public). None = 분석 도구 없음
+PRIVACY_REVISED = "2026년 11월 25일"   # 개인정보 처리방침 개정일 (방문 분석 도구 추가)
 
 BUSINESS = {
     "name": "아이엔골프",                # 상호
