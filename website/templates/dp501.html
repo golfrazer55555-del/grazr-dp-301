@@ -11,19 +11,21 @@
 {% block lang %}{% endblock %}
 {% block header_cta %}<a class="btn btn-small" href="#buy">구매하기</a>{% endblock %}
 {% block main %}
-<section class="hero hero-static" aria-label="GRAZR DP-501">
-  <picture>
-    <source media="(max-width: 720px)" srcset="/media/dp501/hero-m.webp">
-    <img class="hero-img" src="/media/dp501/hero.webp" alt="GRAZR DP-501 파크골프채 헤드" width="1920" height="1080" fetchpriority="high">
-  </picture>
-  <div class="hero-shade" aria-hidden="true"></div>
-  <div class="wrap hero-copy">
-    <p class="eyebrow">{{ p.hero_eyebrow }}</p>
-    <h1 class="display">{{ p.hero_title|safe }}</h1>
-    <p class="hero-sub">{{ p.hero_sub }}</p>
-    <div class="btn-row">
-      {% for label, href, kind in p.hero_buttons %}<a class="btn btn-{{ kind }}" href="{{ href }}">{{ label }}</a>{% endfor %}
+<section class="hero hero-501" data-hero data-frames="{{ hero501_frames }}" data-dir="/media/dp501/hero/" data-portrait="1" data-zoom="1" data-shift="0.12,0.03"
+         data-v="{{ hero501_v }}" aria-label="GRAZR DP-501">
+  <div class="hero-sticky">
+    <canvas class="hero-canvas" data-hero-canvas aria-hidden="true"></canvas>
+    <noscript><img class="hero-noscript" src="/media/dp501/hero/1600/{{ '%03d' % (hero501_frames - 1) }}.webp" alt=""></noscript>
+    <div class="hero-shade" aria-hidden="true"></div>
+    <div class="wrap hero-copy" data-hero-copy>
+      <p class="eyebrow">{{ p.hero_eyebrow }}</p>
+      <h1 class="display">{{ p.hero_title|safe }}</h1>
+      <p class="hero-sub">{{ p.hero_sub }}</p>
+      <div class="btn-row">
+        {% for label, href, kind in p.hero_buttons %}<a class="btn btn-{{ kind }}" href="{{ href }}">{{ label }}</a>{% endfor %}
+      </div>
     </div>
+    <div class="scroll-hint" aria-hidden="true"><span>{{ t.scroll_hint }}</span><i></i></div>
   </div>
 </section>
 
@@ -33,6 +35,17 @@
     <h2 class="h2">{{ p.intro_title }}</h2>
     <p class="lead">{{ p.intro_text }}</p>
   </div>
+  <figure class="wrap intro-clip" data-reveal>
+    <div class="feature-media">
+      <video class="clip" muted playsinline preload="none" poster="/media/dp501/clips/limited.webp" data-clip aria-label="{{ p.limited }}">
+        <source src="/media/dp501/clips/limited.mp4" type="video/mp4">
+      </video>
+      <button class="replay" type="button" data-replay hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>{{ t.replay }}
+      </button>
+    </div>
+    <figcaption>{{ p.limited_clip }}</figcaption>
+  </figure>
 </section>
 
 <section class="features" id="features">
@@ -40,7 +53,12 @@
     {% for f in p.features %}
     <article class="feature{% if loop.index is even %} flip{% endif %}" id="f-{{ f.id }}">
       <div class="feature-media" data-reveal>
-        <img class="clip" src="/media/dp501/f-{{ f.id }}.webp" alt="{{ f.title }}" loading="lazy" width="1280" height="960">
+        <video class="clip" muted playsinline preload="none" poster="/media/dp501/clips/{{ f.id }}.webp" data-clip aria-label="{{ f.en }}">
+          <source src="/media/dp501/clips/{{ f.id }}.mp4" type="video/mp4">
+        </video>
+        <button class="replay" type="button" data-replay hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>{{ t.replay }}
+        </button>
       </div>
       <div class="feature-copy" data-reveal>
         <p class="num">{{ '%02d' % loop.index }}</p>
@@ -53,9 +71,26 @@
   </div>
 </section>
 
+<section class="film" id="film">
+  <div class="wrap">
+    <header class="section-head" data-reveal>
+      <p class="eyebrow">{{ p.film_eyebrow }}</p>
+      <h2 class="h2">{{ p.film_title }}</h2>
+      <p class="body">{{ p.film_note }}</p>
+    </header>
+    <div class="film-frame" data-reveal>
+      <video controls preload="none" playsinline poster="/media/dp501/film-poster.webp" aria-label="{{ p.film_title }}">
+        <source src="/media/dp501/film.mp4" type="video/mp4">
+      </video>
+    </div>
+  </div>
+</section>
+
 <section class="cert" id="cert">
   <div class="wrap cert-grid" data-reveal>
-    <img class="cert-img" src="/media/dp501/cert.webp" alt="(사)대한파크골프협회 공인인증 스티커" loading="lazy" width="800" height="618">
+    <figure class="cert-badge">
+      <img src="/media/dp501/cert.webp" alt="(사)대한파크골프협회 공인인증 스티커" loading="lazy" width="800" height="618">
+    </figure>
     <div>
       <p class="eyebrow">{{ p.cert_eyebrow }}</p>
       <h2 class="h2">{{ p.cert_title }}</h2>
@@ -93,12 +128,15 @@
       <h2 class="h2">{{ t.photos_title }}</h2>
       <p class="body">{{ t.photos_text }}</p>
     </header>
-    <div class="photo-grid">
+    <div class="photo-grid photo-grid-501">
       {% for key, cap in p.photos %}
-      <figure data-reveal>
+      {% set strip = key in ("shaft", "grip") %}
+      <figure class="{% if loop.first %}lead{% elif strip %}strip{% elif key == 'cover' %}wide{% endif %}" data-reveal>
         <button type="button" class="photo" data-photo="/media/dp501/photos/{{ key }}.webp" aria-label="{{ cap }}">
-          <img src="/media/dp501/photos/{{ key }}-640.webp" srcset="/media/dp501/photos/{{ key }}-640.webp 640w, /media/dp501/photos/{{ key }}.webp 1400w"
-               sizes="(max-width: 720px) 50vw, 33vw" alt="{{ cap }}" loading="lazy">
+          {% if strip %}<img src="/media/dp501/photos/{{ key }}-strip-900.webp" srcset="/media/dp501/photos/{{ key }}-strip-900.webp 900w, /media/dp501/photos/{{ key }}-strip.webp 1800w"
+               sizes="(max-width: 720px) 100vw, 1100px" alt="{{ cap }}" loading="lazy">
+          {% else %}<img src="/media/dp501/photos/{{ key }}-640.webp" srcset="/media/dp501/photos/{{ key }}-640.webp 640w, /media/dp501/photos/{{ key }}.webp 1400w"
+               sizes="{% if loop.first %}(max-width: 720px) 100vw, 66vw{% else %}(max-width: 720px) 50vw, 33vw{% endif %}" alt="{{ cap }}" loading="lazy">{% endif %}
         </button>
         <figcaption>{{ cap }}</figcaption>
       </figure>
@@ -150,6 +188,9 @@
       {% endif %}
       <p class="small muted">{{ p.buy_note }}</p>
       <a class="btn btn-kakao btn-block" href="{{ kakao_chat_url }}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c-5.25 0-9.5 3.33-9.5 7.44 0 2.66 1.78 4.99 4.46 6.3l-.9 3.3c-.08.29.25.52.5.35l3.95-2.62c.49.07.99.1 1.49.1 5.25 0 9.5-3.33 9.5-7.43S17.25 3.5 12 3.5z"/></svg><span>{{ t.kakao_ask }}</span></a>
+      <ul class="trust" aria-label="구매 안내">
+        {% for x in p.trust %}<li>{{ x }}</li>{% endfor %}
+      </ul>
       <details class="fold">
         <summary>배송 · 교환 · 반품 안내</summary>
         <dl class="kv">

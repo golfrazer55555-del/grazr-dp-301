@@ -365,3 +365,31 @@ p.small.limited { font: 500 11px/1.4 var(--en); margin: -6px 0 18px; }
   .promise-grid { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 520px) { .promise-grid { grid-template-columns: 1fr; } }
+
+/* ---- DP-501 page: film-driven hero and clips, framed certificate, gallery, purchase notes */
+.intro-clip { margin: clamp(48px, 7vw, 88px) auto 0; max-width: 1040px; }
+.intro-clip .clip { border-radius: 6px; }
+.intro-clip figcaption { margin-top: 14px; font-size: 13px; color: var(--muted); text-align: center; }
+.page-501 .feature-media .clip { border-radius: 6px; }
+@media (min-width: 901px) { .page-501 .cert-grid { grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); } }
+@media (max-width: 900px) { .cert-badge { max-width: 340px; } }
+.cert-badge { margin: 0; justify-self: center; width: 100%; max-width: 400px; padding: clamp(10px, 1.4vw, 16px); border: 1px solid rgba(201, 163, 92, .38); border-radius: 16px; background: linear-gradient(160deg, #17150f 0%, #0b0b0b 60%); box-shadow: 0 28px 80px rgba(0, 0, 0, .65), inset 0 1px 0 rgba(255, 255, 255, .04); }
+.cert-badge img { display: block; width: 100%; height: auto; border-radius: 9px; }
+.photo-grid-501 .photo { aspect-ratio: 1 / 1; }
+.photo-grid-501 .lead { grid-column: span 2; grid-row: span 2; display: flex; flex-direction: column; }
+.photo-grid-501 .lead .photo { flex: 1; aspect-ratio: auto; }
+.photo-grid-501 .wide { grid-column: 1 / -1; }
+.photo-grid-501 .wide .photo { aspect-ratio: 12 / 5; }
+.photo-grid-501 .strip { grid-column: 1 / -1; }
+.photo-grid-501 .strip .photo { aspect-ratio: auto; padding: clamp(14px, 2.6vw, 34px) clamp(8px, 2vw, 28px); }
+.photo-grid-501 .strip .photo img { height: auto; }
+.trust { list-style: none; margin: 26px 0 0; padding: 20px 0 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; font-size: 13.5px; line-height: 1.5; color: var(--body); }
+.trust li { display: flex; align-items: baseline; gap: 10px; }
+.trust li::before { content: ""; flex: none; width: 9px; height: 5px; border-left: 1.5px solid #c9a35c; border-bottom: 1.5px solid #c9a35c; transform: translateY(-3px) rotate(-45deg); }
+@media (max-width: 720px) {
+  .photo-grid-501 .lead { grid-row: auto; }
+  .photo-grid-501 .lead .photo { aspect-ratio: 1 / 1; }
+  .photo-grid-501 .wide { grid-column: auto; }
+  .photo-grid-501 .wide .photo { aspect-ratio: 1 / 1; }
+  .trust { grid-template-columns: 1fr; }
+}

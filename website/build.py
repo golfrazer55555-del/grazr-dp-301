@@ -163,7 +163,7 @@ def jsonld(key=None):
                            "transitTime": {"@type": "QuantitativeValue", "minValue": 1, "maxValue": 3, "unitCode": "DAY"},
                        },
                    },
-                   # 7-day returns by mail; change of mind: buyer pays 16,000 KRW round trip (free outbound), defects: free
+                   # 7-day returns by mail; change of mind: buyer pays 12,000 KRW round trip (free outbound), defects: free
                    "hasMerchantReturnPolicy": {
                        "@type": "MerchantReturnPolicy",
                        "applicableCountry": "KR",
@@ -171,7 +171,7 @@ def jsonld(key=None):
                        "merchantReturnDays": 7,
                        "returnMethod": "https://schema.org/ReturnByMail",
                        "customerRemorseReturnFees": "https://schema.org/ReturnShippingFees",
-                       "customerRemorseReturnShippingFeesAmount": {"@type": "MonetaryAmount", "value": 16000, "currency": "KRW"},
+                       "customerRemorseReturnShippingFeesAmount": {"@type": "MonetaryAmount", "value": 12000, "currency": "KRW"},
                        "itemDefectReturnFees": "https://schema.org/FreeReturn",
                    }},
     }
@@ -185,11 +185,19 @@ def main():
     env = Environment(loader=FileSystemLoader(os.path.join(HERE, "templates")), autoescape=select_autoescape(["html"]),
                       trim_blocks=True, lstrip_blocks=True)
     hero_frames = len([f for f in os.listdir(os.path.join(PUB, "media", "hero", "1600")) if f.endswith(".webp")])
+    # DP-501 scroll hero: frames are fetched by site.js, so their version tag comes from here
+    h501 = os.path.join(PUB, "media", "dp501", "hero")
+    hero501_frames = len([f for f in os.listdir(os.path.join(h501, "1600")) if f.endswith(".webp")])
+    hsum = hashlib.sha1()
+    for d in sorted(os.listdir(h501)):
+        for f in sorted(os.listdir(os.path.join(h501, d))):
+            with open(os.path.join(h501, d, f), "rb") as fh:
+                hsum.update(fh.read())
     common = dict(site_url=C.SITE_URL, store_url=C.STORE_URL, youtube_url=C.YOUTUBE_URL, kakao_url=C.KAKAO_URL, instagram_url=C.INSTAGRAM_URL, kakao_chat_url=C.KAKAO_CHAT_URL, biz=C.BUSINESS,
                   options=C.OPTIONS, shipping=C.SHIPPING, notice=C.NOTICE, direct_pay=C.DIRECT_PAY,
                   hero_frames=hero_frames, year=datetime.date.today().year, fill=fill,
                   price=C.PRICE_KRW, pay_mode=C.PAY_MODE, toss_client_key=C.TOSS_CLIENT_KEY, products=C.PRODUCTS,
-                  ga_id=C.GA_ID)
+                  ga_id=C.GA_ID, hero501_frames=hero501_frames, hero501_v=hsum.hexdigest()[:8])
 
     def render_all(preload, v):
         pages = []

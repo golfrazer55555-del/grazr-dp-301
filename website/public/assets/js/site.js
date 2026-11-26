@@ -31,11 +31,17 @@
     var INTRO = Math.round(N * 0.42);           // frames played on load, the rest follow the scroll
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
     var big = Math.max(window.innerWidth, window.innerHeight) * dpr > 1300;
-    var dir = "/media/hero/" + (big ? "1600" : "960") + "/";
+    // data-dir: frame folder (default the DP-301 hero); data-portrait: it also has 9:16 frames (v960, v1600) for phones
+    var portrait = hero.hasAttribute("data-portrait") && window.innerHeight > window.innerWidth * 1.1;
+    var dir = (hero.getAttribute("data-dir") || "/media/hero/") + (portrait ? "v" : "") + (big ? "1600" : "960") + "/";
+    var ver = hero.getAttribute("data-v") ? "?v=" + hero.getAttribute("data-v") : "";
+    // wide screens: zoom over "cover" and shift (fractions of the canvas) to keep the subject clear of the copy
+    var zoom = parseFloat(hero.getAttribute("data-zoom")) || 1.1;
+    var shift = (hero.getAttribute("data-shift") || "0,0.045").split(",").map(parseFloat);
     var imgs = new Array(N), ok = new Array(N);
     var want = reduceMotion ? N - 1 : 0, shown = -1, introDone = reduceMotion, introStart = 0;
 
-    function src(i) { return dir + ("00" + i).slice(-3) + ".webp"; }
+    function src(i) { return dir + ("00" + i).slice(-3) + ".webp" + ver; }
     function load(i, cb) {
       if (imgs[i]) { if (cb && ok[i]) cb(); return; }
       var im = new Image();
@@ -79,15 +85,23 @@
       shown = i;
       var im = imgs[i], cw = canvas.width, ch = canvas.height, iw = im.naturalWidth, ih = im.naturalHeight;
       var s, dx, dy;
-      if (cw / ch >= 1.15) {                     // landscape: cover, nudged up to leave the lower band for the copy
-        s = Math.max(cw / iw, ch / ih) * 1.1;
-        dx = (cw - iw * s) / 2; dy = (ch - ih * s) / 2 - ch * 0.045;
+      if (ih > iw) {                             // 9:16 frames: cover, raised so the head sits above the copy
+        s = Math.max(cw / iw, ch / ih);
+        dx = (cw - iw * s) / 2; dy = (ch - ih * s) / 2 - ch * 0.08;
+      } else if (cw / ch >= 1.15) {                     // landscape: cover, nudged up to leave the lower band for the copy
+        s = Math.max(cw / iw, ch / ih) * zoom;
+        dx = (cw - iw * s) / 2 + cw * shift[0]; dy = (ch - ih * s) / 2 - ch * shift[1];
       } else {                                   // portrait: fit the width a little larger, head above the copy
         s = (cw / iw) * 1.32;
         dx = (cw - iw * s) / 2; dy = ch * 0.40 - (ih * s) / 2;
       }
       ctx.fillStyle = "#000"; ctx.fillRect(0, 0, cw, ch);
       ctx.drawImage(im, dx, dy, iw * s, ih * s);
+      if (dx > 0) {                              // frame pushed right: fade its left edge into the black
+        var g = ctx.createLinearGradient(dx, 0, dx + cw * 0.12, 0);
+        g.addColorStop(0, "#000"); g.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = g; ctx.fillRect(dx - 1, 0, cw * 0.12 + 1, ch);
+      }
     }
     function scrollTarget() {
       var r = hero.getBoundingClientRect();
