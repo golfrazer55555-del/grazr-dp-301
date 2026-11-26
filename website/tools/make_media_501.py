@@ -94,7 +94,8 @@ def renders():
     full = Image.open(r("full.png"))
     save_webp(full, os.path.join(OUT, "full.webp"), 1200)
     save_webp(full, os.path.join(OUT, "thumb-640.webp"), 640)
-    card = Image.open(r("card.png"))
+    # home card: the whole club in a light column like the DP-301 card (tools/render_card_501.py)
+    card = Image.open(r("card_full.png") if os.path.exists(r("card_full.png")) else r("card.png"))
     save_webp(card, os.path.join(HOME, "dp501.webp"), 1200)
     save_webp(card, os.path.join(HOME, "dp501-640.webp"), 640)
     for k in ("brass", "maple", "shaft", "aim"):
@@ -187,7 +188,13 @@ def headcover():
         print(path, t.size)
 
 
-STEPS = {"photos": photos, "misc": misc, "renders": renders, "hero": hero, "clips": clips, "film": film,
+def card():
+    im = Image.open(os.path.join(RENDERS, "card_full.png"))
+    save_webp(im, os.path.join(HOME, "dp501.webp"), 1200)
+    save_webp(im, os.path.join(HOME, "dp501-640.webp"), 640)
+
+
+STEPS = {"card": card, "photos": photos, "misc": misc, "renders": renders, "hero": hero, "clips": clips, "film": film,
          "headcover": headcover}
 
 if __name__ == "__main__":
