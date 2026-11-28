@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>GRAZR 퍼팅 챌린지 | DP-301 퍼터로 원 퍼트</title>
+<meta name="description" content="GRAZR DP-301 퍼터로 즐기는 스크린골프식 퍼팅 게임. 경사를 읽고 한 번에 넣어 보세요.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="preload" href="/assets/fonts/pretendard-400.645bc585dc.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/montserrat-400.e13f4bc49c.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/css/fonts.css?v=fcaa2037c2">
+<link rel="stylesheet" href="/game/game.css?v=297649bb01">
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-KBEM7SWSQK"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","G-KBEM7SWSQK");</script><script type="importmap">{"imports": {"three": "/assets/vendor/three/three.module.min.js", "three/addons/": "/assets/vendor/three/addons/"}}</script>
+</head>
+<body>
+<canvas class="game" data-canvas aria-label="퍼팅 그린"></canvas>
+<header class="hud-top">
+  <a class="brand" href="/dp-301/" aria-label="GRAZR DP-301 퍼터 보기"><img src="/assets/img/logo-stacked.png" alt="GRAZR" width="40" height="32"></a>
+  <div class="hole-box">
+    <p class="hole" data-hole>연습 그린</p>
+    <p class="strokes"><span data-strokes>0타</span> · 그린 스피드 <span data-speed>3.0</span>m</p>
+  </div>
+  <div class="pin-box">
+    <p class="k">핀까지</p>
+    <p class="big"><span data-dist>0.00</span><small>m</small></p>
+    <p class="elev"><span class="arrow" data-elev-label data-dir="flat">평지</span> <span data-elev>0.00</span>m</p>
+  </div>
+</header>
+<button class="view-btn" type="button" data-view>그린 보기</button>
+<div class="hud-bottom">
+  <div class="aim-btns">
+    <button type="button" data-aim="0.5" aria-label="왼쪽으로 조준">◀</button>
+    <button type="button" data-aim="-0.5" aria-label="오른쪽으로 조준">▶</button>
+  </div>
+  <div class="power" data-power-box>
+    <p class="k">퍼팅 세기</p>
+    <p class="big"><span data-power>3.0</span><small>m</small></p>
+    <div class="meter"><i data-power-fill></i></div>
+    <div class="pow-btns">
+      <button type="button" data-pow="-0.1" aria-label="세기 0.1m 줄이기">−</button>
+      <button type="button" class="putt" data-putt>퍼팅</button>
+      <button type="button" data-pow="0.1" aria-label="세기 0.1m 늘리기">+</button>
+    </div>
+  </div>
+  <p class="hint" data-hint>좌우로 끌어 방향 · 아래로 당겼다 놓으면 퍼팅</p>
+</div>
+<p class="toast" data-toast hidden></p>
+<div class="result" data-result hidden>
+  <div class="card">
+    <p class="eyebrow">GRAZR PUTTING CHALLENGE</p>
+    <h1 data-result-title>홀인!</h1>
+    <p class="sub" data-result-sub></p>
+    <div class="btns">
+      <button type="button" class="btn" data-retry>다시 치기</button>
+      <button type="button" class="btn btn-primary" data-next>다른 홀</button>
+    </div>
+    <a class="more" href="/dp-301/">이 퍼터, GRAZR DP-301 자세히 보기 →</a>
+  </div>
+</div>
+<div class="loading" data-loading>
+  <img src="/assets/img/logo-stacked.png" alt="GRAZR" width="90" height="72">
+  <p>DP-301 퍼터를 불러오는 중</p>
+  <div class="bar"><i data-loading-bar></i></div>
+</div>
+<noscript><p class="noscript">이 게임은 자바스크립트가 필요합니다.</p></noscript>
+<script type="module" src="/game/game.js?v=002934947d"></script>
+</body>
+</html>

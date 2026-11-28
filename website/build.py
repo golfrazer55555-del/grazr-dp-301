@@ -225,6 +225,8 @@ def main():
              {"tpl": "checkout_result.html", "noindex": True, "result": "success"}),
             (C.KO, "/checkout/fail/", "checkout/fail/index.html",
              {"tpl": "checkout_result.html", "noindex": True, "result": "fail"}),
+            # putting game (prototype: not linked from the site, not indexed)
+            (C.KO, "/game/", "game/index.html", {"tpl": "game.html", "noindex": True}),
         ):
             tpl = extra.get("tpl") or ("index.html" if rel.endswith("index.html") and "page_title" not in extra else
                                        ("legal.html" if "page_title" in extra else "404.html"))
@@ -238,11 +240,15 @@ def main():
     css = open(os.path.join(PUB, "assets", "css", "site.css"), "rb").read()
     js = open(os.path.join(PUB, "assets", "js", "site.js"), "rb").read()
     co = open(os.path.join(PUB, "assets", "js", "checkout.js"), "rb").read()
-    first = render_all([], {"css": "", "js": "", "fonts": "", "co": ""})
-    text = html.unescape("".join(p for _, p in first))
+    game_js = open(os.path.join(PUB, "game", "game.js"), "rb").read()
+    game_css = open(os.path.join(PUB, "game", "game.css"), "rb").read()
+    first = render_all([], {"css": "", "js": "", "fonts": "", "co": "", "game": "", "gcss": ""})
+    # the game writes its HUD text from JS: its characters go into the font subset too
+    text = html.unescape("".join(p for _, p in first)) + game_js.decode("utf-8") + game_css.decode("utf-8")
     preload = build_fonts(text)
     fonts_css = open(os.path.join(PUB, "assets", "css", "fonts.css"), "rb").read()
-    v = {"css": short_hash(css), "js": short_hash(js), "fonts": short_hash(fonts_css), "co": short_hash(co)}
+    v = {"css": short_hash(css), "js": short_hash(js), "fonts": short_hash(fonts_css), "co": short_hash(co),
+         "game": short_hash(game_js), "gcss": short_hash(game_css)}
     for rel, page in render_all(preload, v):
         write(rel, MEDIA_URL.sub(media_version, re.sub(r"\n\s*\n+", "\n", page)))
         print("page", rel)
